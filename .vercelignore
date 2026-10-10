@@ -1,0 +1,9 @@
+# Never upload local credentials or tooling with a CLI deployment; Vercel injects its own env vars.
+.env*
+.vercel
+data
+.agents
+.claude
+skills-lock.json
+node_modules
+.next
