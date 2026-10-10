@@ -16,9 +16,9 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   const type = typeof sp.type === "string" && sp.type in CONTRIBUTION_TYPES ? (sp.type as ContributionType) : undefined;
   const q = typeof sp.q === "string" ? sp.q.slice(0, 200) : undefined;
   const origin = sp.origin === "fjournal" || sp.origin === "imported" ? (sp.origin as FeedOrigin) : undefined;
-  const items = feed({ sort, type, q, origin });
-  const stats = platformStats();
-  const top = topContributors(8);
+  const items = await feed({ sort, type, q, origin });
+  const stats = await platformStats();
+  const top = await topContributors(8);
 
   const href = (o: Record<string, string | undefined>) => {
     const p = new URLSearchParams();

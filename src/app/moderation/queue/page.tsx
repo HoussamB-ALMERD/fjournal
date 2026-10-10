@@ -11,9 +11,9 @@ export const metadata = { title: "Moderator queue" };
 export default async function QueuePage() {
   const me = await currentUser();
   if (!me) redirect("/login?next=/moderation/queue");
-  if (!isModerator(me)) redirect("/moderation");
-  const reports = openReports();
-  const appeals = openAppeals();
+  if (!(await isModerator(me))) redirect("/moderation");
+  const reports = await openReports();
+  const appeals = await openAppeals();
 
   return (
     <div className="space-y-10">

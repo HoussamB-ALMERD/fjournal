@@ -7,7 +7,7 @@ import { OrcidBadge } from "@/components/ui";
 export const metadata = { title: "Join with ORCID" };
 
 export default async function OrcidSignupPage() {
-  const pending = unsign<{ orcid: string; name: string }>((await cookies()).get("fj_orcid_pending")?.value);
+  const pending = await unsign<{ orcid: string; name: string }>((await cookies()).get("fj_orcid_pending")?.value);
   if (!pending)
     return (
       <div className="mx-auto max-w-sm space-y-4 py-10">

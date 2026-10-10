@@ -44,9 +44,9 @@ import { SubmitToCollectionForm, WithdrawForm } from "@/components/CollectionFor
 
 export async function generateMetadata({ params }: PageProps<"/c/[id]">): Promise<Metadata> {
   const { id } = await params;
-  const c = getContribution(id);
-  const v = c && getVersion(id, c.latest_version);
-  if (!v || c.status === "hidden") return {};
+  const c = await getContribution(id);
+  const v = c && (await getVersion(id, c.latest_version));
+  if (!c || !v || c.status === "hidden") return {};
   // Highwire tags for indexers — only for work published here; imported works are indexed at their source.
   const other = v.source
     ? undefined
@@ -62,9 +62,9 @@ export async function generateMetadata({ params }: PageProps<"/c/[id]">): Promis
 export default async function ContributionPage({ params, searchParams }: PageProps<"/c/[id]">) {
   const { id } = await params;
   const sp = await searchParams;
-  const c = getContribution(id);
+  const c = await getContribution(id);
   if (!c) notFound();
-  const modActions = actionsForContribution(id);
+  const modActions = await actionsForContribution(id);
   const latestOn = (targetId: string) => modActions.filter((a) => a.target_id === targetId && a.action !== "restore").at(-1);
 
   if (c.status === "hidden") {
@@ -85,32 +85,46 @@ export default async function ContributionPage({ params, searchParams }: PagePro
 
   const requested = Number(sp.v);
   const vNum = Number.isInteger(requested) && requested >= 1 && requested <= c.latest_version ? requested : c.latest_version;
-  const v = getVersion(id, vNum)!;
+  const [v, latest, me] = await Promise.all([getVersion(id, vNum), getVersion(id, c.latest_version), currentUser()]);
+  if (!v || !latest) notFound();
   const isLatest = vNum === c.latest_version;
-  const me = await currentUser();
   const isOwner = me?.id === c.owner_id;
+  // Independent reads, fetched together: each is a round trip to the database.
+  const [
+    isAuthorResult, claimedAuthors, checks, versions, reviews, replications, endorsements, comments, s, votedResult, target, allCollections,
+    myIsModerator, runs,
+  ] = await Promise.all([
+    me ? isAuthorOf(me.id, id) : Promise.resolve(false),
+    verifiedAuthors(id),
+    checksFor(v.seq),
+    listVersions(id),
+    listReviews(id),
+    listReplications(id),
+    listEndorsements(id),
+    listComments(id),
+    scrutinyFor(id, latest.artifacts, c.latest_version),
+    me ? votedReviewIds(me.id, id) : Promise.resolve(new Set<string>()),
+    c.replication_of ? getContribution(c.replication_of) : Promise.resolve(undefined),
+    collectionsForWork(id),
+    isModerator(me),
+    runsForVersion(v.seq),
+  ]);
   // Owners and members who proved authorship through ORCID: they answer reviews, they don't write them.
-  const isAuthor = !!me && isAuthorOf(me.id, id);
-  const claimedAuthors = verifiedAuthors(id);
+  const isAuthor = !!me && isAuthorResult;
+  const voted = votedResult;
   const authorHandles = new Set([c.owner_handle, ...claimedAuthors.map((a) => a.handle)].filter(Boolean));
   const retraction = c.status === "retracted" ? latestOn(id) : undefined;
-  const checks = checksFor(v.seq);
-
-  const versions = listVersions(id);
-  const reviews = listReviews(id);
-  const replications = listReplications(id);
-  const endorsements = listEndorsements(id);
-  const comments = listComments(id);
-  const s = scrutinyFor(id, getVersion(id, c.latest_version)!.artifacts, c.latest_version);
-  const voted = me ? votedReviewIds(me.id, id) : new Set<string>();
-  const target = c.replication_of ? getContribution(c.replication_of) : undefined;
-  const targetTitle = target ? getVersion(target.id, target.latest_version)?.title : undefined;
+  const targetTitle = target ? (await getVersion(target.id, target.latest_version))?.title : undefined;
   const year = new Date(v.created_at).getUTCFullYear();
   const src = v.source; // set only on works published elsewhere and imported for review
   const serious = src ? seriousNotices(src) : [];
   // Withdrawn entries live only in the collection's log; everything else is shown here.
-  const inCollections = collectionsForWork(id).filter((x) => x.status !== "withdrawn");
-  const submittable = isAuthor && c.status === "active" ? openForSubmission(id) : [];
+  const inCollections = allCollections.filter((x) => x.status !== "withdrawn");
+  const submittable = isAuthor && c.status === "active" ? await openForSubmission(id) : [];
+  // Collections where the viewer sits on the board, for the "decide" link.
+  const myBoards = new Set(
+    me ? (await Promise.all(inCollections.map(async (x) => ((await roleOf(x.collection_id, me.id)) ? x.collection_id : null)))).filter(Boolean) : [],
+  );
 
   return (
     <div className="grid gap-10 lg:grid-cols-[1fr_300px]">
@@ -329,11 +343,11 @@ export default async function ContributionPage({ params, searchParams }: PagePro
           )}
         </section>
 
-        <IntegrityPanel checks={checks} contributionId={id} versionNumber={vNum} canRerun={isOwner || isModerator(me) || (!!me && me.id === c.imported_by)} />
+        <IntegrityPanel checks={checks} contributionId={id} versionNumber={vNum} canRerun={isOwner || myIsModerator || (!!me && me.id === c.imported_by)} />
 
         {!src && (
           <ReproductionPanel
-            runs={runsForVersion(v.seq)}
+            runs={runs}
             hasCode={!!codeTarget(v.artifacts)}
             enabled={reproEnabled()}
             canRequest={!!me}
@@ -547,7 +561,7 @@ export default async function ContributionPage({ params, searchParams }: PagePro
                       {x.status === "submitted" && x.nominated ? " · nominated by the board" : ""}
                       {x.decided_by_handle && x.status !== "submitted" && <> · by @{x.decided_by_handle}</>} ·{" "}
                       <Link href={`/j/${x.slug}/log#e${x.log_seq}`} className="underline">{x.status === "submitted" ? "log" : "reasoning"}</Link>
-                      {x.status === "submitted" && me && roleOf(x.collection_id, me.id) && !isAuthor && (
+                      {x.status === "submitted" && myBoards.has(x.collection_id) && !isAuthor && (
                         <> · <Link href={`/j/${x.slug}/desk`} className="text-accent underline">decide</Link></>
                       )}
                     </p>

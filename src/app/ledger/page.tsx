@@ -6,18 +6,18 @@ import { fmtDate } from "@/components/ui";
 export const metadata = { title: "Public ledger" };
 
 export default async function LedgerPage() {
-  const check = verifyLedger();
-  const rows = all<{ seq: number; contribution_id: string; number: number; title: string; content_hash: string; chain_hash: string; created_at: string }>(
+  const check = await verifyLedger();
+  const rows = await all<{ seq: number; contribution_id: string; number: number; title: string; content_hash: string; chain_hash: string; created_at: string }>(
     "SELECT seq, contribution_id, number, title, content_hash, chain_hash, created_at FROM versions ORDER BY seq DESC LIMIT 200",
   );
-  const reviewRows = all<{ seq: number; review_id: string; reviewer: string; title: string; chain_hash: string; created_at: string }>(
+  const reviewRows = await all<{ seq: number; review_id: string; reviewer: string; title: string; chain_hash: string; created_at: string }>(
     `SELECT l.seq, l.review_id, u.display_name AS reviewer, v.title, l.chain_hash, l.created_at
      FROM review_ledger l JOIN reviews r ON r.id = l.review_id JOIN users u ON u.id = r.reviewer_id
      JOIN versions v ON v.contribution_id = r.contribution_id AND v.number = r.version_number
      ORDER BY l.seq DESC LIMIT 100`,
   );
 
-  const collectionRows = all<{ seq: number; kind: string; slug: string; name: string; actor: string; chain_hash: string; created_at: string }>(
+  const collectionRows = await all<{ seq: number; kind: string; slug: string; name: string; actor: string; chain_hash: string; created_at: string }>(
     `SELECT l.seq, l.kind, co.slug, co.name, u.display_name AS actor, l.chain_hash, l.created_at
      FROM collection_log l JOIN collections co ON co.id = l.collection_id JOIN users u ON u.id = l.actor_id
      ORDER BY l.seq DESC LIMIT 100`,

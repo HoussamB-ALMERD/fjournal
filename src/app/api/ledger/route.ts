@@ -3,7 +3,7 @@ import { GENESIS, verifyLedger } from "@/lib/ledger";
 
 /** Full ledger export so anyone can mirror and independently verify the chain. */
 export async function GET() {
-  const entries = all<{
+  const entries = await all<{
     seq: number;
     contribution_id: string;
     number: number;
@@ -13,11 +13,11 @@ export async function GET() {
     created_at: string;
   }>("SELECT seq, contribution_id, number, content_hash, prev_chain_hash, chain_hash, created_at FROM versions ORDER BY seq ASC");
   // Reviews have their own chain: chain_hash = sha256("review|" + prev|content_hash|review_id|created_at).
-  const review_entries = all<{ seq: number; review_id: string; content_hash: string; prev_chain_hash: string; chain_hash: string; created_at: string }>(
+  const review_entries = await all<{ seq: number; review_id: string; content_hash: string; prev_chain_hash: string; chain_hash: string; created_at: string }>(
     "SELECT seq, review_id, content_hash, prev_chain_hash, chain_hash, created_at FROM review_ledger ORDER BY seq ASC",
   );
   // Board changes and editorial decisions: chain_hash = sha256("collection|" + prev|content_hash|created_at).
-  const collection_entries = all<{ seq: number; collection_id: string; kind: string; content_hash: string; prev_chain_hash: string; chain_hash: string; created_at: string }>(
+  const collection_entries = await all<{ seq: number; collection_id: string; kind: string; content_hash: string; prev_chain_hash: string; chain_hash: string; created_at: string }>(
     "SELECT seq, collection_id, kind, content_hash, prev_chain_hash, chain_hash, created_at FROM collection_log ORDER BY seq ASC",
   );
   return Response.json({
@@ -28,7 +28,7 @@ export async function GET() {
     review_entries,
     genesis: GENESIS,
     head: entries.at(-1)?.chain_hash ?? GENESIS,
-    verification: verifyLedger(),
+    verification: await verifyLedger(),
     generated_at: new Date().toISOString(),
     entries,
   });

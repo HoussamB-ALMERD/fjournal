@@ -51,7 +51,7 @@ export function chainHash(prev: string, content: string, contributionId: string,
 }
 
 /** Must be called inside tx(): reads the ledger head and appends atomically. */
-export function appendVersion(args: {
+export async function appendVersion(args: {
   contributionId: string;
   number: number;
   content: VersionContent;
@@ -59,20 +59,20 @@ export function appendVersion(args: {
   createdBy: string;
   createdAt: string;
 }) {
-  const head = get<{ chain_hash: string }>("SELECT chain_hash FROM versions ORDER BY seq DESC LIMIT 1");
+  const head = await get<{ chain_hash: string }>("SELECT chain_hash FROM versions ORDER BY seq DESC LIMIT 1");
   const prev = head?.chain_hash ?? GENESIS;
   const ch = contentHash(args.content);
   const chain = chainHash(prev, ch, args.contributionId, args.number, args.createdAt);
   const c = args.content;
-  const res = run(
+  const res = await run<{ seq: number }>(
     `INSERT INTO versions (contribution_id, number, title, abstract, body, authors, license, artifacts, declarations, source,
        change_note, content_hash, prev_chain_hash, chain_hash, created_by, created_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) RETURNING seq`,
     args.contributionId, args.number, c.title, c.abstract, c.body, JSON.stringify(c.authors), c.license,
     JSON.stringify(c.artifacts), c.declarations ? JSON.stringify(c.declarations) : null, c.source ? JSON.stringify(c.source) : null,
     args.changeNote, ch, prev, chain, args.createdBy, args.createdAt,
   );
-  return { seq: Number(res.lastInsertRowid), contentHash: ch, chainHash: chain, prevChainHash: prev };
+  return { seq: res.rows[0].seq, contentHash: ch, chainHash: chain, prevChainHash: prev };
 }
 
 export type LedgerRow = {
@@ -111,24 +111,24 @@ export function rowContent(r: LedgerRow): VersionContent {
 // can prove what they wrote and when, and nobody can edit a review after the fact.
 
 /** Must be called inside tx(), after the review row is inserted. */
-export function appendReviewEntry(reviewId: string, createdAt: string) {
-  const r = get<ReviewContent & { id: string }>(`${REVIEW_CONTENT_SQL} WHERE r.id = ?`, reviewId);
+export async function appendReviewEntry(reviewId: string, createdAt: string) {
+  const r = await get<ReviewContent & { id: string }>(`${REVIEW_CONTENT_SQL} WHERE r.id = ?`, reviewId);
   if (!r) throw new Error(`Review ${reviewId} not found for the ledger.`);
-  const head = get<{ chain_hash: string }>("SELECT chain_hash FROM review_ledger ORDER BY seq DESC LIMIT 1");
+  const head = await get<{ chain_hash: string }>("SELECT chain_hash FROM review_ledger ORDER BY seq DESC LIMIT 1");
   const prev = head?.chain_hash ?? GENESIS;
   const content = reviewContentHash(reviewContentOf(r));
   const chain = reviewChainHash(prev, content, reviewId, createdAt);
-  const res = run(
-    "INSERT INTO review_ledger (review_id, content_hash, prev_chain_hash, chain_hash, created_at) VALUES (?,?,?,?,?)",
+  const res = await run<{ seq: number }>(
+    "INSERT INTO review_ledger (review_id, content_hash, prev_chain_hash, chain_hash, created_at) VALUES (?,?,?,?,?) RETURNING seq",
     reviewId, content, prev, chain, createdAt,
   );
-  return { seq: Number(res.lastInsertRowid), contentHash: content, chainHash: chain };
+  return { seq: res.rows[0].seq, contentHash: content, chainHash: chain };
 }
 
 type Verification = { ok: boolean; checked: number; firstBadSeq?: number; reason?: string };
 
-function verifyReviewChain(): Verification {
-  const rows = all<ReviewContent & { id: string; seq: number; content_hash: string; prev_chain_hash: string; chain_hash: string; entry_at: string }>(
+async function verifyReviewChain(): Promise<Verification> {
+  const rows = await all<ReviewContent & { id: string; seq: number; content_hash: string; prev_chain_hash: string; chain_hash: string; entry_at: string }>(
     `${REVIEW_CONTENT_SQL.replace("SELECT r.id,", "SELECT l.seq, l.content_hash, l.prev_chain_hash, l.chain_hash, l.created_at AS entry_at, r.id,")}
      JOIN review_ledger l ON l.review_id = r.id ORDER BY l.seq ASC`,
   );
@@ -140,7 +140,7 @@ function verifyReviewChain(): Verification {
     if (reviewChainHash(prev, r.content_hash, r.id, r.entry_at) !== r.chain_hash) return bad("chain hash mismatch");
     prev = r.chain_hash;
   }
-  const total = get<{ n: number }>("SELECT COUNT(*) AS n FROM reviews")!.n;
+  const total = (await get<{ n: number }>("SELECT COUNT(*) AS n FROM reviews"))!.n;
   if (total !== rows.length) return { ok: false, checked: rows.length, reason: `review chain: ${total - rows.length} reviews missing from the ledger` };
   return { ok: true, checked: rows.length };
 }
@@ -177,7 +177,7 @@ export function collectionPolicy(r: Omit<CollectionPolicy, "continues"> & { cont
 }
 
 /** Must be called inside tx(). Returns the new entry's sequence number. */
-export function appendCollectionEntry(args: {
+export async function appendCollectionEntry(args: {
   collectionId: string;
   kind: string;
   actorId: string;
@@ -185,19 +185,19 @@ export function appendCollectionEntry(args: {
   payload: unknown;
   createdAt: string;
 }) {
-  const head = get<{ chain_hash: string }>("SELECT chain_hash FROM collection_log ORDER BY seq DESC LIMIT 1");
+  const head = await get<{ chain_hash: string }>("SELECT chain_hash FROM collection_log ORDER BY seq DESC LIMIT 1");
   const prev = head?.chain_hash ?? GENESIS;
   const payload = JSON.parse(JSON.stringify(args.payload ?? {})); // exactly what will be read back
   const content = collectionEntryHash({
     collection_id: args.collectionId, kind: args.kind, actor_id: args.actorId, subject: args.subject, payload, created_at: args.createdAt,
   });
   const chain = collectionChainHash(prev, content, args.createdAt);
-  const res = run(
+  const res = await run<{ seq: number }>(
     `INSERT INTO collection_log (collection_id, kind, actor_id, subject, payload, content_hash, prev_chain_hash, chain_hash, created_at)
-     VALUES (?,?,?,?,?,?,?,?,?)`,
+     VALUES (?,?,?,?,?,?,?,?,?) RETURNING seq`,
     args.collectionId, args.kind, args.actorId, args.subject, JSON.stringify(payload), content, prev, chain, args.createdAt,
   );
-  return Number(res.lastInsertRowid);
+  return res.rows[0].seq;
 }
 
 /** What the log says each item's status is after an entry of this kind. */
@@ -208,8 +208,8 @@ const MEMBER_STATUS: Record<string, string> = {
   founded: "active", invited: "invited", joined: "active", declined_invite: "declined", left: "left", removed: "removed",
 };
 
-function verifyCollectionChain(): Verification {
-  const rows = all<{
+async function verifyCollectionChain(): Promise<Verification> {
+  const rows = await all<{
     seq: number; collection_id: string; kind: string; actor_id: string; subject: string | null; payload: string;
     content_hash: string; prev_chain_hash: string; chain_hash: string; created_at: string;
   }>("SELECT * FROM collection_log ORDER BY seq ASC");
@@ -241,7 +241,7 @@ function verifyCollectionChain(): Verification {
   }
   const fail = (reason: string) => ({ ok: false, checked: rows.length, reason: `collection state: ${reason}` });
 
-  const itemRows = all<{ collection_id: string; contribution_id: string; status: string; version_number: number; log_seq: number }>(
+  const itemRows = await all<{ collection_id: string; contribution_id: string; status: string; version_number: number; log_seq: number }>(
     "SELECT collection_id, contribution_id, status, version_number, log_seq FROM collection_items",
   );
   if (itemRows.length !== items.size) return fail("items and log disagree on how many works were ever submitted");
@@ -250,7 +250,7 @@ function verifyCollectionChain(): Verification {
     if (!e || e.status !== i.status || e.version !== i.version_number || e.seq !== i.log_seq)
       return fail(`fj:${i.contribution_id} is "${i.status}" in ${i.collection_id}, but the log says otherwise`);
   }
-  const memberRows = all<{ collection_id: string; user_id: string; status: string; role: string }>(
+  const memberRows = await all<{ collection_id: string; user_id: string; status: string; role: string }>(
     "SELECT collection_id, user_id, status, role FROM collection_members",
   );
   if (memberRows.length !== members.size) return fail("board records and log disagree");
@@ -258,7 +258,7 @@ function verifyCollectionChain(): Verification {
     const e = members.get(`${m.collection_id}|${m.user_id}`);
     if (!e || e.status !== m.status || e.role !== m.role) return fail(`a board membership of ${m.collection_id} differs from the log`);
   }
-  const collections = all<CollectionPolicy & { id: string; continues: string | null }>(`SELECT id, ${POLICY_FIELDS.join(", ")} FROM collections`);
+  const collections = await all<CollectionPolicy & { id: string; continues: string | null }>(`SELECT id, ${POLICY_FIELDS.join(", ")} FROM collections`);
   if (collections.length !== policies.size) return fail("a collection exists without a founding entry");
   for (const c of collections)
     if (policies.get(c.id) !== canonicalJson(collectionPolicy(c))) return fail(`the policy of ${c.id} was changed outside the log`);
@@ -266,10 +266,8 @@ function verifyCollectionChain(): Verification {
 }
 
 /** Recompute every hash from stored content, in all three chains. Any tampering breaks a chain from that point on. */
-export function verifyLedger(): Verification & { versions: Verification; reviews: Verification; collections: Verification } {
-  const versions = verifyVersionChain();
-  const reviews = verifyReviewChain();
-  const collections = verifyCollectionChain();
+export async function verifyLedger(): Promise<Verification & { versions: Verification; reviews: Verification; collections: Verification }> {
+  const [versions, reviews, collections] = await Promise.all([verifyVersionChain(), verifyReviewChain(), verifyCollectionChain()]);
   const first = [versions, reviews, collections].find((v) => !v.ok) ?? versions;
   return {
     ...first,
@@ -281,8 +279,8 @@ export function verifyLedger(): Verification & { versions: Verification; reviews
   };
 }
 
-function verifyVersionChain(): Verification {
-  const rows = all<LedgerRow>("SELECT * FROM versions ORDER BY seq ASC");
+async function verifyVersionChain(): Promise<Verification> {
+  const rows = await all<LedgerRow>("SELECT * FROM versions ORDER BY seq ASC");
   let prev = GENESIS;
   for (const r of rows) {
     if (r.prev_chain_hash !== prev) return { ok: false, checked: rows.length, firstBadSeq: r.seq, reason: "broken link" };

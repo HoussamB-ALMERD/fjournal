@@ -14,27 +14,27 @@ export async function publicUrl(): Promise<string> {
 }
 
 /** Signing key: FJOURNAL_SECRET if set, otherwise generated once and kept in the database. */
-function appSecret(): string {
+async function appSecret(): Promise<string> {
   if (process.env.FJOURNAL_SECRET) return process.env.FJOURNAL_SECRET;
-  const row = get<{ value: string }>("SELECT value FROM meta WHERE key = 'secret'");
+  const row = await get<{ value: string }>("SELECT value FROM meta WHERE key = 'secret'");
   if (row) return row.value;
   const value = randomBytes(32).toString("hex");
-  run("INSERT OR IGNORE INTO meta (key, value) VALUES ('secret', ?)", value);
-  return get<{ value: string }>("SELECT value FROM meta WHERE key = 'secret'")!.value;
+  await run("INSERT INTO meta (key, value) VALUES ('secret', ?) ON CONFLICT (key) DO NOTHING", value);
+  return (await get<{ value: string }>("SELECT value FROM meta WHERE key = 'secret'"))!.value;
 }
 
 /** A tamper-proof, expiring value for a cookie. */
-export function sign(payload: object, ttlSeconds: number): string {
+export async function sign(payload: object, ttlSeconds: number): Promise<string> {
   const body = Buffer.from(JSON.stringify({ ...payload, exp: Date.now() + ttlSeconds * 1000 })).toString("base64url");
-  const mac = createHmac("sha256", appSecret()).update(body).digest("base64url");
+  const mac = createHmac("sha256", await appSecret()).update(body).digest("base64url");
   return `${body}.${mac}`;
 }
 
-export function unsign<T>(token: string | undefined): T | null {
+export async function unsign<T>(token: string | undefined): Promise<T | null> {
   if (!token) return null;
   const [body, mac] = token.split(".");
   if (!body || !mac) return null;
-  const expected = createHmac("sha256", appSecret()).update(body).digest();
+  const expected = createHmac("sha256", await appSecret()).update(body).digest();
   const given = Buffer.from(mac, "base64url");
   if (given.length !== expected.length || !timingSafeEqual(given, expected)) return null;
   const data = JSON.parse(Buffer.from(body, "base64url").toString()) as T & { exp: number };

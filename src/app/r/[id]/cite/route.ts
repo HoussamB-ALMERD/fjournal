@@ -5,9 +5,9 @@ import { getContribution, getReview, getVersion } from "@/lib/queries";
 /** ?format=bibtex (default) | ris | csl */
 export async function GET(req: Request, ctx: RouteContext<"/r/[id]/cite">) {
   const { id } = await ctx.params;
-  const r = getReview(id);
-  const c = r && getContribution(r.contribution_id);
-  const v = r && c && getVersion(c.id, r.version_number);
+  const r = await getReview(id);
+  const c = r && (await getContribution(r.contribution_id));
+  const v = r && c && (await getVersion(c.id, r.version_number));
   if (!r || !c || !v || r.hidden || c.status === "hidden") return Response.json({ error: "not found" }, { status: 404 });
   const input = citationInput(r, v.title, await publicUrl());
   const format = new URL(req.url).searchParams.get("format") ?? "bibtex";

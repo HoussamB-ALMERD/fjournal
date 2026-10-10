@@ -9,13 +9,13 @@ import { fmtDate } from "@/components/ui";
 
 export async function generateMetadata({ params }: PageProps<"/report/[id]">): Promise<Metadata> {
   const { id } = await params;
-  const r = frozenReport(id);
+  const r = await frozenReport(id);
   return { title: r ? `Scrutiny report of ${r.data.researcher.name} (frozen)` : "Not found", robots: { index: false } };
 }
 
 export default async function FrozenReportPage({ params }: PageProps<"/report/[id]">) {
   const { id } = await params;
-  const r = frozenReport(id);
+  const r = await frozenReport(id);
   if (!r) notFound();
   const base = await publicUrl();
   const live = `/u/${r.handle}/report${r.data.period.years ? `?years=${r.data.period.years}` : ""}`;

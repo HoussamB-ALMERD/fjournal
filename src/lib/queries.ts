@@ -3,7 +3,7 @@ import { all, get } from "./db";
 import type { Artifact } from "./ledger";
 import type { ContributionType, Declarations, License, Recommendation, ReplicationOutcome, SourceKind, SourceRecord } from "./constants";
 import { scrutiny } from "./scrutiny";
-import { reputationOf, weightOf } from "./reputation";
+import { reputationOf, weightFromReputation } from "./reputation";
 import { computationallyReproduced } from "./repro/runs";
 import { selectionsFor } from "./collections";
 
@@ -69,15 +69,13 @@ export function getContribution(id: string) {
   return get<ContributionRow>(`${CONTRIB_SELECT} WHERE c.id = ?`, id);
 }
 
-export function getVersion(contributionId: string, number: number) {
-  const r = get<RawVersion>("SELECT * FROM versions WHERE contribution_id = ? AND number = ?", contributionId, number);
+export async function getVersion(contributionId: string, number: number) {
+  const r = await get<RawVersion>("SELECT * FROM versions WHERE contribution_id = ? AND number = ?", contributionId, number);
   return r ? parseVersion(r) : undefined;
 }
 
-export function listVersions(contributionId: string) {
-  return all<RawVersion>("SELECT * FROM versions WHERE contribution_id = ? ORDER BY number DESC", contributionId).map(
-    parseVersion,
-  );
+export async function listVersions(contributionId: string) {
+  return (await all<RawVersion>("SELECT * FROM versions WHERE contribution_id = ? ORDER BY number DESC", contributionId)).map(parseVersion);
 }
 
 export type ReviewRow = {
@@ -123,15 +121,14 @@ export function getReview(id: string) {
   return get<ReviewRow>(`${REVIEW_SELECT} WHERE r.id = ?`, id);
 }
 
-export function votedReviewIds(userId: string, contributionId: string): Set<string> {
-  return new Set(
-    all<{ review_id: string }>(
-      `SELECT v.review_id FROM review_votes v JOIN reviews r ON r.id = v.review_id
-       WHERE v.voter_id = ? AND r.contribution_id = ?`,
-      userId,
-      contributionId,
-    ).map((r) => r.review_id),
+export async function votedReviewIds(userId: string, contributionId: string): Promise<Set<string>> {
+  const rows = await all<{ review_id: string }>(
+    `SELECT v.review_id FROM review_votes v JOIN reviews r ON r.id = v.review_id
+     WHERE v.voter_id = ? AND r.contribution_id = ?`,
+    userId,
+    contributionId,
   );
+  return new Set(rows.map((r) => r.review_id));
 }
 
 export function listReplications(contributionId: string) {
@@ -161,18 +158,24 @@ export function listComments(contributionId: string) {
   );
 }
 
-export function scrutinyFor(contributionId: string, artifacts: Artifact[], versions: number) {
-  const reviews = all<{ reviewer_id: string; soundness: number; reproducibility: number }>(
-    "SELECT reviewer_id, soundness, reproducibility FROM reviews WHERE contribution_id = ? AND hidden = 0",
-    contributionId,
-  ).map((r) => ({ ...r, weight: weightOf(r.reviewer_id) }));
-  const replications = all<{ outcome: ReplicationOutcome | null }>(
-    "SELECT replication_outcome AS outcome FROM contributions WHERE replication_of = ? AND status = 'active'",
-    contributionId,
-  );
-  const endorsements =
-    get<{ n: number }>("SELECT COUNT(*) AS n FROM endorsements WHERE contribution_id = ?", contributionId)?.n ?? 0;
-  return scrutiny({ reviews, replications, endorsements, artifacts, versions, computational: computationallyReproduced(contributionId) });
+export async function scrutinyFor(contributionId: string, artifacts: Artifact[], versions: number) {
+  const [reviewRows, replications, endorsed, computational] = await Promise.all([
+    // Each reviewer's reputation comes with their review, so weights take one query, not one per reviewer.
+    all<{ reviewer_id: string; soundness: number; reproducibility: number; rep: number }>(
+      `SELECT r.reviewer_id, r.soundness, r.reproducibility,
+         COALESCE((SELECT SUM(e.points) FROM reputation_events e WHERE e.user_id = r.reviewer_id), 0) AS rep
+       FROM reviews r WHERE r.contribution_id = ? AND r.hidden = 0`,
+      contributionId,
+    ),
+    all<{ outcome: ReplicationOutcome | null }>(
+      "SELECT replication_outcome AS outcome FROM contributions WHERE replication_of = ? AND status = 'active'",
+      contributionId,
+    ),
+    get<{ n: number }>("SELECT COUNT(*) AS n FROM endorsements WHERE contribution_id = ?", contributionId),
+    computationallyReproduced(contributionId),
+  ]);
+  const reviews = reviewRows.map((r) => ({ ...r, weight: weightFromReputation(r.rep) }));
+  return scrutiny({ reviews, replications, endorsements: endorsed?.n ?? 0, artifacts, versions, computational });
 }
 
 export type FeedItem = ContributionRow & {
@@ -191,9 +194,9 @@ export type FeedItem = ContributionRow & {
 export type FeedSort = "latest" | "needs-review" | "most-scrutinized" | "replications-negative";
 export type FeedOrigin = "fjournal" | "imported";
 
-export function feed(
+export async function feed(
   opts: { sort?: FeedSort; type?: ContributionType; owner?: string; q?: string; origin?: FeedOrigin; collection?: string; limit?: number } = {},
-) {
+): Promise<FeedItem[]> {
   const where: string[] = ["c.status <> 'hidden'"];
   const params: string[] = [];
   // A collection's selections, most recently selected first unless another order is asked for.
@@ -213,22 +216,24 @@ export function feed(
     params.push(opts.owner);
   }
   if (opts.q) {
-    where.push("(v.title LIKE ? OR v.abstract LIKE ? OR v.authors LIKE ?)");
+    where.push("(v.title ILIKE ? OR v.abstract ILIKE ? OR v.authors ILIKE ?)");
     const like = `%${opts.q}%`;
     params.push(like, like, like);
   }
+  // Ordered on the outer query, because Postgres doesn't allow output aliases inside ORDER BY expressions.
   const order =
     opts.sort === "needs-review"
-      ? "review_count ASC, c.created_at DESC"
+      ? "review_count ASC, created_at DESC"
       : opts.sort === "most-scrutinized"
-        ? "(review_count + 2 * replication_count + endorsement_count) DESC, c.updated_at DESC"
+        ? "(review_count + 2 * replication_count + endorsement_count) DESC, updated_at DESC"
         : opts.collection
-          ? "ci.decided_at DESC"
-          : "c.updated_at DESC";
+          ? "selected_at DESC"
+          : "updated_at DESC";
 
-  const rows = all<ContributionRow & { title: string; abstract: string; authors: string; license: License; artifacts: string; source: string | null; review_count: number; replication_count: number; endorsement_count: number }>(
-    `SELECT c.*, u.handle AS owner_handle, u.display_name AS owner_name, i.handle AS importer_handle,
-       v.title, v.abstract, v.authors, v.license, v.artifacts, v.source,
+  const rows = await all<ContributionRow & { title: string; abstract: string; authors: string; license: License; artifacts: string; source: string | null; review_count: number; replication_count: number; endorsement_count: number }>(
+    `SELECT * FROM (
+     SELECT c.*, u.handle AS owner_handle, u.display_name AS owner_name, i.handle AS importer_handle,
+       v.title, v.abstract, v.authors, v.license, v.artifacts, v.source${opts.collection ? ", ci.decided_at AS selected_at" : ""},
        (SELECT COUNT(*) FROM reviews r WHERE r.contribution_id = c.id AND r.hidden = 0) AS review_count,
        (SELECT COUNT(*) FROM contributions x WHERE x.replication_of = c.id) AS replication_count,
        (SELECT COUNT(*) FROM endorsements e WHERE e.contribution_id = c.id) AS endorsement_count
@@ -238,26 +243,29 @@ export function feed(
      JOIN versions v ON v.contribution_id = c.id AND v.number = c.latest_version
      ${join}
      WHERE ${where.join(" AND ")}
+     ) f
      ORDER BY ${order}
      LIMIT ${Math.min(opts.limit ?? 50, 200)}`,
     ...params,
   );
-  const selected = selectionsFor(rows.map((r) => r.id));
-  return rows.map((r): FeedItem => {
-    const artifacts: Artifact[] = JSON.parse(r.artifacts);
-    return {
+  const [selected, scrutinies] = await Promise.all([
+    selectionsFor(rows.map((r) => r.id)),
+    Promise.all(rows.map((r) => scrutinyFor(r.id, JSON.parse(r.artifacts) as Artifact[], r.latest_version))),
+  ]);
+  return rows.map(
+    (r, i): FeedItem => ({
       ...r,
       authors: JSON.parse(r.authors),
       source: r.source ? JSON.parse(r.source) : null,
-      scrutiny: scrutinyFor(r.id, artifacts, r.latest_version),
+      scrutiny: scrutinies[i],
       collections: selected.get(r.id) ?? [],
-    };
-  });
+    }),
+  );
 }
 
 export function getUserByHandle(handle: string) {
   return get<{ id: string; handle: string; display_name: string; bio: string; affiliation: string; orcid: string | null; orcid_verified_at: string | null; created_at: string }>(
-    "SELECT id, handle, display_name, bio, affiliation, orcid, orcid_verified_at, created_at FROM users WHERE handle = ?",
+    "SELECT id, handle, display_name, bio, affiliation, orcid, orcid_verified_at, created_at FROM users WHERE lower(handle) = lower(?::text)",
     handle,
   );
 }
@@ -282,22 +290,22 @@ export function reviewsBy(userId: string) {
 
 export function topContributors(limit = 10) {
   return all<{ handle: string; display_name: string; rep: number }>(
-    `SELECT u.handle, u.display_name, ROUND(SUM(e.points), 0) AS rep
+    `SELECT u.handle, u.display_name, ROUND(SUM(e.points)::numeric, 0) AS rep
      FROM reputation_events e JOIN users u ON u.id = e.user_id
      GROUP BY u.id ORDER BY rep DESC LIMIT ?`,
     limit,
   );
 }
 
-export function platformStats() {
-  return get<{ contributions: number; versions: number; reviews: number; replications: number; people: number }>(
+export async function platformStats() {
+  return (await get<{ contributions: number; versions: number; reviews: number; replications: number; people: number }>(
     `SELECT
        (SELECT COUNT(*) FROM contributions WHERE status <> 'hidden') AS contributions,
        (SELECT COUNT(*) FROM versions) AS versions,
        (SELECT COUNT(*) FROM reviews WHERE hidden = 0) AS reviews,
        (SELECT COUNT(*) FROM contributions WHERE type = 'replication' AND status <> 'hidden') AS replications,
        (SELECT COUNT(*) FROM users) AS people`,
-  )!;
+  ))!;
 }
 
 export { reputationOf };

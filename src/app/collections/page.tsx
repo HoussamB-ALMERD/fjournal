@@ -5,7 +5,7 @@ import { onAccent } from "@/lib/color";
 export const metadata = { title: "Collections" };
 
 export default async function CollectionsPage() {
-  const collections = listCollections();
+  const collections = await listCollections();
   return (
     <div className="space-y-10">
       <section className="grid gap-8 border-b border-line pb-10 lg:grid-cols-[1fr_340px]">

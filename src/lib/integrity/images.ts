@@ -60,9 +60,11 @@ export async function checkImages(versionSeq: number, contributionId: string, bo
       if (contentType && !contentType.startsWith("image/")) throw new Error(`Not an image (${contentType}).`);
       const fp = await fingerprint(buffer);
       mine.push({ url, fp });
-      run(
-        `INSERT OR REPLACE INTO image_fingerprints (version_seq, contribution_id, url, sha256, dhash, dhash_mirror, created_at)
-         VALUES (?,?,?,?,?,?,?)`,
+      await run(
+        `INSERT INTO image_fingerprints (version_seq, contribution_id, url, sha256, dhash, dhash_mirror, created_at)
+         VALUES (?,?,?,?,?,?,?)
+         ON CONFLICT (version_seq, url) DO UPDATE SET sha256 = excluded.sha256, dhash = excluded.dhash,
+           dhash_mirror = excluded.dhash_mirror, created_at = excluded.created_at`,
         versionSeq, contributionId, url, fp.sha256, fp.dhash, fp.dhash_mirror, now(),
       );
     } catch (e) {
@@ -72,7 +74,7 @@ export async function checkImages(versionSeq: number, contributionId: string, bo
   if (mine.length === 0) return findings;
 
   // Full scan is fine at MVP scale; replace with a BK-tree or LSH index as the corpus grows.
-  const others = all<Stored>(
+  const others = await all<Stored>(
     `SELECT f.contribution_id, f.version_seq, f.url, f.sha256, f.dhash, v.number
      FROM image_fingerprints f JOIN versions v ON v.seq = f.version_seq
      WHERE f.contribution_id <> ?`,

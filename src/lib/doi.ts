@@ -27,10 +27,10 @@ const DAILY_LIMIT = 25;
 export const reviewDoiFor = (prefix: string, reviewId: string) => `${prefix}/fj.review.${reviewId}`.toLowerCase();
 
 /** Reserves a DOI for a review. Must run inside tx(). Only the reviewer can ask, once. */
-export function reserveReviewDoi(reviewId: string, userId: string): string {
+export async function reserveReviewDoi(reviewId: string, userId: string): Promise<string> {
   const cfg = doiConfig();
   if (!cfg) throw new DoiError("DOI registration isn't configured on this Fjournal instance yet.");
-  const r = get<{ reviewer_id: string; hidden: number; doi: string | null; doi_status: string | null }>(
+  const r = await get<{ reviewer_id: string; hidden: number; doi: string | null; doi_status: string | null }>(
     "SELECT reviewer_id, hidden, doi, doi_status FROM reviews WHERE id = ?",
     reviewId,
   );
@@ -39,10 +39,10 @@ export function reserveReviewDoi(reviewId: string, userId: string): string {
   if (r.hidden) throw new DoiError("This review was removed by moderation.");
   if (r.doi_status === "registered" || r.doi_status === "pending") throw new DoiError("This review already has a DOI.");
   const since = new Date(Date.now() - 86400_000).toISOString();
-  const recent = get<{ n: number }>("SELECT COUNT(*) AS n FROM reviews WHERE reviewer_id = ? AND doi_requested_at > ?", userId, since)!.n;
+  const recent = (await get<{ n: number }>("SELECT COUNT(*) AS n FROM reviews WHERE reviewer_id = ? AND doi_requested_at > ?", userId, since))!.n;
   if (recent >= DAILY_LIMIT) throw new DoiError(`You can register up to ${DAILY_LIMIT} review DOIs a day.`);
   const doi = r.doi ?? reviewDoiFor(cfg.prefix, reviewId);
-  run("UPDATE reviews SET doi = ?, doi_status = 'pending', doi_error = NULL, doi_requested_at = ? WHERE id = ?", doi, now(), reviewId);
+  await run("UPDATE reviews SET doi = ?, doi_status = 'pending', doi_error = NULL, doi_requested_at = ? WHERE id = ?", doi, now(), reviewId);
   return doi;
 }
 
@@ -97,7 +97,7 @@ export function reviewMetadata(r: ReviewForDoi, site: string) {
 export async function registerReviewDoi(reviewId: string) {
   const cfg = doiConfig();
   if (!cfg) return;
-  const r = get<ReviewForDoi>(
+  const r = await get<ReviewForDoi>(
     `SELECT r.id, r.doi, r.body, r.recommendation, r.license, r.created_at, r.contribution_id, r.version_number,
             u.display_name, u.orcid, u.orcid_verified_at, v.title, v.source
      FROM reviews r JOIN users u ON u.id = r.reviewer_id
@@ -120,8 +120,8 @@ export async function registerReviewDoi(reviewId: string) {
       const text = (await res.text()).slice(0, 500);
       throw new Error(`DataCite answered HTTP ${res.status}: ${text}`);
     }
-    run("UPDATE reviews SET doi_status = 'registered', doi_error = NULL WHERE id = ?", reviewId);
+    await run("UPDATE reviews SET doi_status = 'registered', doi_error = NULL WHERE id = ?", reviewId);
   } catch (e) {
-    run("UPDATE reviews SET doi_status = 'failed', doi_error = ? WHERE id = ?", e instanceof Error ? e.message : String(e), reviewId);
+    await run("UPDATE reviews SET doi_status = 'failed', doi_error = ? WHERE id = ?", e instanceof Error ? e.message : String(e), reviewId);
   }
 }

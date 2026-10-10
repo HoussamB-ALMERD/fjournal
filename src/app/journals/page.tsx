@@ -24,7 +24,7 @@ export default async function IndexPage({ searchParams }: PageProps<"/journals">
       </p>
     </header>
   );
-  if (!canViewIndex(me))
+  if (!(await canViewIndex(me)))
     return (
       <div className="space-y-6">
         {intro}
@@ -38,7 +38,7 @@ export default async function IndexPage({ searchParams }: PageProps<"/journals">
       </div>
     );
 
-  const rows = listIndex(isModerator(me));
+  const rows = await listIndex(await isModerator(me));
   const fields = [...new Set(rows.map((r) => r.journal.field))].sort();
   const shown = typeof field === "string" && field ? rows.filter((r) => r.journal.field === field) : rows;
 

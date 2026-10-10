@@ -12,24 +12,24 @@ import { OrcidBadge, UserLink, fmtDate, timeAgo } from "@/components/ui";
 
 export async function generateMetadata({ params }: PageProps<"/j/[slug]">): Promise<Metadata> {
   const { slug } = await params;
-  const c = getCollection(slug);
+  const c = await getCollection(slug);
   return c ? { title: c.name, description: c.tagline || c.scope.slice(0, 300) } : {};
 }
 
 export default async function CollectionPage({ params }: PageProps<"/j/[slug]">) {
   const { slug } = await params;
-  const c = getCollection(slug);
+  const c = await getCollection(slug);
   if (!c) notFound();
   const me = await currentUser();
-  const role = roleOf(c.id, me?.id);
-  const board = boardOf(c.id);
-  const invited = me ? boardOf(c.id, ["invited"]).some((m) => m.user_id === me.id) : false;
+  const role = await roleOf(c.id, me?.id);
+  const board = await boardOf(c.id);
+  const invited = me ? (await boardOf(c.id, ["invited"])).some((m) => m.user_id === me.id) : false;
   const verified = board.filter((m) => m.orcid).length;
 
-  const selected = feed({ collection: c.id, limit: 200 });
-  const decisions = new Map(itemsOf(c.id, ["selected"]).map((i) => [i.contribution_id, i]));
-  const considering = itemsOf(c.id, ["submitted"]);
-  const declined = itemsOf(c.id, ["declined"]).length;
+  const selected = await feed({ collection: c.id, limit: 200 });
+  const decisions = new Map((await itemsOf(c.id, ["selected"])).map((i) => [i.contribution_id, i]));
+  const considering = await itemsOf(c.id, ["submitted"]);
+  const declined = (await itemsOf(c.id, ["declined"])).length;
 
   return (
     <div className="space-y-8">

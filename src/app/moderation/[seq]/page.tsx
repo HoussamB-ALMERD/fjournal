@@ -12,14 +12,15 @@ export async function generateMetadata({ params }: PageProps<"/moderation/[seq]"
 
 export default async function ActionPage({ params }: PageProps<"/moderation/[seq]">) {
   const seq = Number((await params).seq);
-  const a = Number.isInteger(seq) ? getAction(seq) : undefined;
+  const a = Number.isInteger(seq) ? await getAction(seq) : undefined;
   if (!a) notFound();
   const me = await currentUser();
-  const appeals = appealsFor(seq);
-  const target = resolveTarget(a.target_type, a.target_id);
+  const appeals = await appealsFor(seq);
+  const target = await resolveTarget(a.target_type, a.target_id);
   const isAffected = !!me && target?.owner_id === me.id;
   const openAppeal = appeals.find((ap) => ap.status === "open");
-  const canResolve = isModerator(me) && me!.id !== a.moderator_id && !isAffected;
+  const meIsModerator = await isModerator(me);
+  const canResolve = meIsModerator && me!.id !== a.moderator_id && !isAffected;
   const targetHref =
     a.target_type === "contribution" ? `/c/${a.contribution_id}` : `/c/${a.contribution_id}#${a.target_type === "review" ? a.target_id : "discussion"}`;
 
@@ -87,7 +88,7 @@ export default async function ActionPage({ params }: PageProps<"/moderation/[seq
                 </div>
               )}
               {ap.status === "open" && canResolve && <ResolveAppealForm actionSeq={a.seq} appealId={ap.id} />}
-              {ap.status === "open" && isModerator(me) && !canResolve && (
+              {ap.status === "open" && meIsModerator && !canResolve && (
                 <p className="text-xs text-muted">You can&apos;t decide this appeal: it must go to a moderator with no involvement.</p>
               )}
             </div>

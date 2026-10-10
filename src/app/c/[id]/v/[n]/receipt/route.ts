@@ -3,8 +3,8 @@ import { getContribution, getVersion } from "@/lib/queries";
 /** A self-contained, downloadable proof that this exact content existed at this time in the ledger. */
 export async function GET(req: Request, ctx: RouteContext<"/c/[id]/v/[n]/receipt">) {
   const { id, n } = await ctx.params;
-  const c = getContribution(id);
-  const v = c && getVersion(id, Number(n));
+  const c = await getContribution(id);
+  const v = c && (await getVersion(id, Number(n)));
   if (!c || !v) return Response.json({ error: "not found" }, { status: 404 });
 
   const origin = new URL(req.url).origin;

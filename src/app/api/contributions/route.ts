@@ -7,9 +7,9 @@ export async function GET(req: Request) {
   const sp = new URL(req.url).searchParams;
   const type = sp.get("type");
   const slug = sp.get("collection");
-  const collection = slug ? getCollection(slug) : undefined;
+  const collection = slug ? await getCollection(slug) : undefined;
   if (slug && !collection) return Response.json({ error: `no collection "${slug}"` }, { status: 404 });
-  const items = feed({
+  const items = await feed({
     collection: collection?.id,
     sort: (sp.get("sort") as FeedSort) ?? "latest",
     type: type && type in CONTRIBUTION_TYPES ? (type as ContributionType) : undefined,

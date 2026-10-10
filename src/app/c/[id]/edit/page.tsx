@@ -10,10 +10,10 @@ export default async function EditPage({ params }: PageProps<"/c/[id]/edit">) {
   const { id } = await params;
   const me = await currentUser();
   if (!me) redirect(`/login?next=/c/${id}/edit`);
-  const c = getContribution(id);
+  const c = await getContribution(id);
   if (!c) notFound();
   if (c.owner_id !== me.id) redirect(`/c/${id}`);
-  const v = getVersion(id, c.latest_version)!;
+  const v = await getVersion(id, c.latest_version)!;
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">

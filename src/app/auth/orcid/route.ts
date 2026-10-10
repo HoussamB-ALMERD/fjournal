@@ -17,7 +17,7 @@ export async function GET(req: Request) {
   if (mode === "link" && !(await currentUser())) redirect("/login?next=/settings");
 
   const state = randomBytes(16).toString("base64url");
-  (await cookies()).set(STATE_COOKIE, sign({ state, mode, next }, 600), {
+  (await cookies()).set(STATE_COOKIE, await sign({ state, mode, next }, 600), {
     httpOnly: true,
     sameSite: "lax", // sent on the top-level redirect back from orcid.org
     secure: process.env.NODE_ENV === "production",

@@ -27,8 +27,8 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
   if (!me) redirect("/login?next=/settings");
   const { orcid } = await searchParams;
   const note = typeof orcid === "string" ? NOTES[orcid] : undefined;
-  const invitations = invitationsFor(me.id);
-  const report = reportSettingsOf(me.id);
+  const invitations = await invitationsFor(me.id);
+  const report = await reportSettingsOf(me.id);
   return (
     <div className="mx-auto max-w-lg space-y-8">
       <h1 className="font-serif text-3xl font-bold">Your profile</h1>
@@ -94,7 +94,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
           A one-page summary of your public record for hiring and funding committees. You choose only two things: a statement
           in your own words, and which works to be judged on. Everything else is the record as it stands.
         </p>
-        <ReportSettingsForm statement={report.statement} highlights={report.highlights} works={highlightableWorks(me.id)} />
+        <ReportSettingsForm statement={report.statement} highlights={report.highlights} works={await highlightableWorks(me.id)} />
       </section>
     </div>
   );

@@ -11,10 +11,11 @@ export const metadata = { title: "Index review" };
 
 export default async function IndexReviewPage() {
   const me = await currentUser();
-  if (!isModerator(me)) notFound();
-  const ds = drafts();
-  const replies = pendingReplies();
-  const corrections = openCorrections();
+  if (!(await isModerator(me))) notFound();
+  const ds = await drafts();
+  const replies = await pendingReplies();
+  const corrections = await openCorrections();
+  const previews = new Map(await Promise.all(ds.map(async (a) => [a.id, await journalPage(a.issn, true)] as const)));
 
   return (
     <div className="space-y-10">
@@ -30,7 +31,7 @@ export default async function IndexReviewPage() {
         <h2 className="font-serif text-xl font-semibold">Drafts ({ds.length})</h2>
         {ds.length === 0 && <p className="text-sm text-muted">No drafts.</p>}
         {ds.map((a) => {
-          const p = journalPage(a.issn, true);
+          const p = previews.get(a.id);
           return (
             <article key={a.id} className="card space-y-3 p-4">
               <div className="flex flex-wrap items-baseline gap-3">

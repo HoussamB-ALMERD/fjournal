@@ -12,15 +12,15 @@ import { Markdown } from "@/components/Markdown";
 import { RequestDoiForm } from "@/components/forms";
 import { OrcidBadge, SourceTag, Stars, UserLink, fmtDate } from "@/components/ui";
 
-function load(id: string) {
-  const r = getReview(id);
-  const c = r && getContribution(r.contribution_id);
-  const v = r && c && getVersion(c.id, r.version_number);
+async function load(id: string) {
+  const r = await getReview(id);
+  const c = r && (await getContribution(r.contribution_id));
+  const v = r && c && (await getVersion(c.id, r.version_number));
   return r && c && v ? { r, c, v } : null;
 }
 
 export async function generateMetadata({ params }: PageProps<"/r/[id]">): Promise<Metadata> {
-  const d = load((await params).id);
+  const d = await load((await params).id);
   if (!d || d.r.hidden || d.c.status === "hidden") return {};
   const { r, v } = d;
   // Highwire tags, which Google Scholar and reference managers read.
@@ -40,12 +40,12 @@ export async function generateMetadata({ params }: PageProps<"/r/[id]">): Promis
 
 export default async function ReviewPage({ params }: PageProps<"/r/[id]">) {
   const { id } = await params;
-  const d = load(id);
+  const d = await load(id);
   if (!d) notFound();
   const { r, c, v } = d;
 
   if (r.hidden || c.status === "hidden") {
-    const a = actionsForContribution(c.id).filter((x) => x.target_id === (r.hidden ? r.id : c.id) && x.action !== "restore").at(-1);
+    const a = (await actionsForContribution(c.id)).filter((x) => x.target_id === (r.hidden ? r.id : c.id) && x.action !== "restore").at(-1);
     return (
       <div className="mx-auto max-w-2xl space-y-4 py-10 text-center">
         <p className="font-mono text-xs text-muted">review {r.id}</p>

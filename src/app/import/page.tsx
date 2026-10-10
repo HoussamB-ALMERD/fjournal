@@ -16,7 +16,7 @@ const SOURCES = [
 export default async function ImportPage({ searchParams }: PageProps<"/import">) {
   const sp = await searchParams;
   const me = await currentUser();
-  const recent = feed({ origin: "imported", limit: 10 });
+  const recent = await feed({ origin: "imported", limit: 10 });
   const initial = typeof sp.id === "string" ? sp.id.slice(0, 500) : undefined;
 
   return (

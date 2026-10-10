@@ -31,9 +31,9 @@ export default async function JournalPage({ params }: PageProps<"/journals/[issn
   const { issn: raw } = await params;
   const issn = normalizeIssn(raw);
   const me = await currentUser();
-  if (!issn || !canViewIndex(me)) notFound();
-  const preview = isModerator(me);
-  const d = journalPage(issn, preview);
+  if (!issn || !(await canViewIndex(me))) notFound();
+  const preview = await isModerator(me);
+  const d = await journalPage(issn, preview);
   if (!d) notFound();
   const { journal: j, assessment: a, indicators: ind, baselines: b } = d;
   const draft = a.status === "draft";

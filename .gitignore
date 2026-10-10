@@ -40,5 +40,10 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# local database
+# legacy local SQLite database from the prototype
 /data/
+
+# agent skills installed by marketplace integrations (local tooling, not app code)
+/.agents/
+/.claude/
+skills-lock.json

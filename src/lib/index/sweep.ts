@@ -213,19 +213,19 @@ export async function sweep(args: {
   });
 
   const id = `ia_${shortId(10)}`;
-  tx(() => {
+  await tx(async () => {
     const ts = now();
-    if (get("SELECT 1 FROM index_journals WHERE issn = ?", issn))
-      run("UPDATE index_journals SET title = ?, publisher = ?, issns = ?, field = ? WHERE issn = ?", info.title, info.publisher, JSON.stringify(info.issns), args.field.trim(), issn);
+    if (await get("SELECT 1 FROM index_journals WHERE issn = ?", issn))
+      await run("UPDATE index_journals SET title = ?, publisher = ?, issns = ?, field = ? WHERE issn = ?", info.title, info.publisher, JSON.stringify(info.issns), args.field.trim(), issn);
     else
-      run("INSERT INTO index_journals (issn, title, publisher, issns, field, created_at) VALUES (?,?,?,?,?,?)", issn, info.title, info.publisher, JSON.stringify(info.issns), args.field.trim(), ts);
-    run(
+      await run("INSERT INTO index_journals (issn, title, publisher, issns, field, created_at) VALUES (?,?,?,?,?,?)", issn, info.title, info.publisher, JSON.stringify(info.issns), args.field.trim(), ts);
+    await run(
       `INSERT INTO index_assessments (id, issn, method_version, window_from, window_until, sample_target, total_articles, retracted, concerns, retraction_days, created_by, created_at)
        VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
       id, issn, METHOD_VERSION, args.from, args.until, args.sample, total, retractions.count, concerns.count, JSON.stringify(retractions.days), args.createdBy, ts,
     );
     for (const m of measured)
-      run(
+      await run(
         `INSERT INTO index_articles (assessment_id, doi, title, issued, license_url, cc_license, fulltext, tests, inconsistent, gross, one_tailed, findings, data_class, data_excerpt, error)
          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         id, m.doi, m.title, m.issued, m.license_url, m.cc_license, m.fulltext, m.tests, m.inconsistent, m.gross, m.one_tailed,
@@ -236,4 +236,4 @@ export async function sweep(args: {
   return id;
 }
 
-export const draftsCount = () => all<{ n: number }>("SELECT COUNT(*) AS n FROM index_assessments WHERE status = 'draft'")[0]?.n ?? 0;
+export const draftsCount = async () => (await all<{ n: number }>("SELECT COUNT(*) AS n FROM index_assessments WHERE status = 'draft'"))[0]?.n ?? 0;

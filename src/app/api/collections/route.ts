@@ -6,7 +6,7 @@ export async function GET() {
   const base = await publicUrl();
   return Response.json({
     kind: "fjournal.collections/v1",
-    items: listCollections().map((c) => ({
+    items: (await listCollections()).map((c) => ({
       slug: c.slug,
       name: c.name,
       tagline: c.tagline,

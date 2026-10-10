@@ -17,7 +17,7 @@ export default async function ReportPage({ params, searchParams }: PageProps<"/u
   const { handle } = await params;
   const { years: y } = await searchParams;
   const years = PERIODS.find((p) => String(p) === y) ?? null;
-  const data = buildReport(handle, years);
+  const data = await buildReport(handle, years);
   if (!data) notFound();
   const me = await currentUser();
   const base = await publicUrl();

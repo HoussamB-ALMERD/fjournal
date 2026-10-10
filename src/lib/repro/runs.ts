@@ -111,12 +111,12 @@ const versionInfo = (seq: number) =>
   );
 
 /** Queues a run for a version if it has pinned code. Returns the run id, or null if there's nothing to run. */
-export function enqueueRun(versionSeq: number, requestedBy: string | null): string | null {
-  const v = versionInfo(versionSeq);
+export async function enqueueRun(versionSeq: number, requestedBy: string | null): Promise<string | null> {
+  const v = await versionInfo(versionSeq);
   if (!v || v.status === "hidden" || v.source_kind || !codeTarget(JSON.parse(v.artifacts))) return null;
-  if (get("SELECT 1 FROM repro_runs WHERE version_seq = ? AND status IN ('queued','running')", versionSeq)) return null;
+  if (await get("SELECT 1 FROM repro_runs WHERE version_seq = ? AND status IN ('queued','running')", versionSeq)) return null;
   const id = `run_${randomBytes(6).toString("hex")}`;
-  run(
+  await run(
     "INSERT INTO repro_runs (id, version_seq, contribution_id, status, requested_by, created_at) VALUES (?,?,?,?,?,?)",
     id, versionSeq, v.contribution_id, "queued", requestedBy, now(),
   );
@@ -124,35 +124,35 @@ export function enqueueRun(versionSeq: number, requestedBy: string | null): stri
 }
 
 /** A person asking for a (re-)run. Runs cost real compute, so they're rate limited. */
-export function requestRun(versionSeq: number, userId: string): string {
+export async function requestRun(versionSeq: number, userId: string): Promise<string> {
   if (!reproEnabled()) throw new ReproError("The reproducibility bot isn't enabled on this Fjournal instance yet.");
-  const v = versionInfo(versionSeq);
+  const v = await versionInfo(versionSeq);
   if (!v || v.status === "hidden") throw new ReproError("Version not found.");
   if (v.source_kind) throw new ReproError("Imported works can't be run yet: their code isn't pinned on Fjournal.");
   if (!codeTarget(JSON.parse(v.artifacts))) throw new ReproError("This version has no code pinned to a GitHub commit.");
-  if (get("SELECT 1 FROM repro_runs WHERE version_seq = ? AND status IN ('queued','running')", versionSeq))
+  if (await get("SELECT 1 FROM repro_runs WHERE version_seq = ? AND status IN ('queued','running')", versionSeq))
     throw new ReproError("A run for this version is already queued.");
   const hourAgo = new Date(Date.now() - 3600_000).toISOString();
-  if (get("SELECT 1 FROM repro_runs WHERE version_seq = ? AND finished_at > ? AND status <> 'error'", versionSeq, hourAgo))
+  if (await get("SELECT 1 FROM repro_runs WHERE version_seq = ? AND finished_at > ? AND status <> 'error'", versionSeq, hourAgo))
     throw new ReproError("This version was run within the last hour. Results are deterministic enough that a re-run can wait.");
   const dayAgo = new Date(Date.now() - 86400_000).toISOString();
-  if (get<{ n: number }>("SELECT COUNT(*) AS n FROM repro_runs WHERE requested_by = ? AND created_at > ?", userId, dayAgo)!.n >= DAILY_REQUESTS)
+  if ((await get<{ n: number }>("SELECT COUNT(*) AS n FROM repro_runs WHERE requested_by = ? AND created_at > ?", userId, dayAgo))!.n >= DAILY_REQUESTS)
     throw new ReproError(`You can request up to ${DAILY_REQUESTS} runs a day.`);
-  return enqueueRun(versionSeq, userId)!;
+  return (await enqueueRun(versionSeq, userId))!;
 }
 
-export function claimNextRun(worker: string): { id: string } | null {
-  return tx(() => {
-    const next = get<{ id: string }>("SELECT id FROM repro_runs WHERE status = 'queued' ORDER BY created_at ASC LIMIT 1");
+export async function claimNextRun(worker: string): Promise<{ id: string } | null> {
+  return tx(async () => {
+    const next = await get<{ id: string }>("SELECT id FROM repro_runs WHERE status = 'queued' ORDER BY created_at ASC LIMIT 1 FOR UPDATE SKIP LOCKED");
     if (!next) return null;
-    run("UPDATE repro_runs SET status = 'running', worker = ?, started_at = ? WHERE id = ?", worker, now(), next.id);
+    await run("UPDATE repro_runs SET status = 'running', worker = ?, started_at = ? WHERE id = ?", worker, now(), next.id);
     return next;
   });
 }
 
 /** Runs left 'running' by a worker that died are reported, never silently retried. */
-export function recoverStaleRuns(worker: string) {
-  run(
+export async function recoverStaleRuns(worker: string) {
+  await run(
     "UPDATE repro_runs SET status = 'error', summary = 'The worker stopped during this run. Request a new run.', finished_at = ? WHERE status = 'running' AND worker = ?",
     now(), worker,
   );
@@ -165,16 +165,16 @@ type Finish = Partial<{
   manifest: string; results: OutputResult[]; log: string; exit_code: number | null; setup_seconds: number; run_seconds: number;
 }>;
 
-function finish(id: string, status: RunStatus, f: Finish) {
-  const row = get<{ version_seq: number }>("SELECT version_seq FROM repro_runs WHERE id = ?", id)!;
-  const versionHash = get<{ h: string }>("SELECT content_hash AS h FROM versions WHERE seq = ?", row.version_seq)!.h;
+async function finish(id: string, status: RunStatus, f: Finish) {
+  const row = (await get<{ version_seq: number }>("SELECT version_seq FROM repro_runs WHERE id = ?", id))!;
+  const versionHash = (await get<{ h: string }>("SELECT content_hash AS h FROM versions WHERE seq = ?", row.version_seq))!.h;
   const resultHash = createHash("sha256")
     .update(canonicalJson({
       version_content_hash: versionHash, status, repo: f.repo, commit: f.commit_sha, archive_sha256: f.archive_sha256,
       image: f.image, image_digest: f.image_digest, manifest: f.manifest, results: f.results,
     }))
     .digest("hex");
-  run(
+  await run(
     `UPDATE repro_runs SET status = ?, summary = ?, repo = ?, commit_sha = ?, archive_sha256 = ?, image = ?, image_digest = ?,
        manifest = ?, results = ?, log = ?, exit_code = ?, setup_seconds = ?, run_seconds = ?, result_hash = ?, finished_at = ?
      WHERE id = ?`,
@@ -185,9 +185,9 @@ function finish(id: string, status: RunStatus, f: Finish) {
 }
 
 export async function executeRun(id: string, getSource: (t: CodeTarget) => Promise<RunSource> = githubSource) {
-  const r = get<{ version_seq: number }>("SELECT version_seq FROM repro_runs WHERE id = ?", id);
+  const r = await get<{ version_seq: number }>("SELECT version_seq FROM repro_runs WHERE id = ?", id);
   if (!r) return;
-  const v = get<{ artifacts: string; abstract: string; body: string }>("SELECT artifacts, abstract, body FROM versions WHERE seq = ?", r.version_seq)!;
+  const v = (await get<{ artifacts: string; abstract: string; body: string }>("SELECT artifacts, abstract, body FROM versions WHERE seq = ?", r.version_seq))!;
   const target = codeTarget(JSON.parse(v.artifacts));
   if (!target) return finish(id, "invalid", { summary: "No code pinned to a GitHub commit." });
 
@@ -243,17 +243,19 @@ export type RunRow = {
   created_at: string; started_at: string | null; finished_at: string | null;
 };
 
-export function runsForVersion(seq: number): RunRow[] {
-  return all<Omit<RunRow, "results"> & { results: string | null }>(
-    `SELECT r.*, u.handle AS requested_by_handle FROM repro_runs r LEFT JOIN users u ON u.id = r.requested_by
-     WHERE r.version_seq = ? ORDER BY r.created_at DESC`,
-    seq,
+export async function runsForVersion(seq: number): Promise<RunRow[]> {
+  return (
+    await all<Omit<RunRow, "results"> & { results: string | null }>(
+      `SELECT r.*, u.handle AS requested_by_handle FROM repro_runs r LEFT JOIN users u ON u.id = r.requested_by
+       WHERE r.version_seq = ? ORDER BY r.created_at DESC`,
+      seq,
+    )
   ).map((r) => ({ ...r, results: r.results ? JSON.parse(r.results) : null }));
 }
 
 /** True when the latest version's most recent finished run reproduced every declared result. */
-export function computationallyReproduced(contributionId: string): boolean {
-  const last = get<{ status: string }>(
+export async function computationallyReproduced(contributionId: string): Promise<boolean> {
+  const last = await get<{ status: string }>(
     `SELECT r.status FROM repro_runs r
      JOIN contributions c ON c.id = r.contribution_id
      JOIN versions v ON v.contribution_id = c.id AND v.number = c.latest_version AND v.seq = r.version_seq

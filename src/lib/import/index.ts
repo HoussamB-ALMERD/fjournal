@@ -46,14 +46,14 @@ export async function importWork(input: string, importerId: string): Promise<Imp
   const sourceId = ident.kind === "arxiv" ? ident.id : ident.doi;
 
   // Already here, and nothing newer was asked for: no need to touch the network.
-  const before = existingFor(sourceId);
+  const before = await existingFor(sourceId);
   if (before) {
     const versioned = JSON.parse(before.source ?? "{}").version != null;
     if (!versioned || (ident.version !== null && ident.version <= sourceVersion(before)))
       return { id: before.id, seq: null, status: "unchanged" };
   } else {
     const since = new Date(Date.now() - 3600_000).toISOString();
-    const recent = get<{ n: number }>("SELECT COUNT(*) AS n FROM contributions WHERE imported_by = ? AND created_at > ?", importerId, since)!.n;
+    const recent = (await get<{ n: number }>("SELECT COUNT(*) AS n FROM contributions WHERE imported_by = ? AND created_at > ?", importerId, since))!.n;
     if (recent >= HOURLY_LIMIT) throw new ImportError(`You can import up to ${HOURLY_LIMIT} works per hour. Try again a little later.`);
   }
 
@@ -61,18 +61,18 @@ export async function importWork(input: string, importerId: string): Promise<Imp
   const content = toContent(work);
   const label = work.kind === "doi" ? work.source.venue || "the publisher" : SOURCE_KINDS[work.kind];
 
-  return tx(() => {
+  return tx(async () => {
     const ts = now();
     // Re-read under the write lock: two people may import the same paper at the same moment.
-    const e = existingFor(work.sourceId);
+    const e = await existingFor(work.sourceId);
     if (!e) {
       const id = contributionId();
-      run(
+      await run(
         `INSERT INTO contributions (id, type, owner_id, latest_version, created_at, updated_at, source_kind, source_id, imported_by)
          VALUES (?,?,NULL,1,?,?,?,?,?)`,
         id, work.type, ts, ts, work.kind, work.sourceId, importerId,
       );
-      const v = appendVersion({
+      const v = await appendVersion({
         contributionId: id, number: 1, content, createdBy: importerId, createdAt: ts,
         changeNote: `Imported from ${label}${work.source.version ? ` (v${work.source.version})` : ""}`,
       });
@@ -82,11 +82,11 @@ export async function importWork(input: string, importerId: string): Promise<Imp
     if (work.source.version === null || Number(work.source.version) <= sourceVersion(e))
       return { id: e.id, seq: null, status: "unchanged" as const };
     const number = e.latest_version + 1;
-    const v = appendVersion({
+    const v = await appendVersion({
       contributionId: e.id, number, content, createdBy: importerId, createdAt: ts,
       changeNote: `New version at ${label}: v${work.source.version}`,
     });
-    run("UPDATE contributions SET latest_version = ?, updated_at = ? WHERE id = ?", number, ts, e.id);
+    await run("UPDATE contributions SET latest_version = ?, updated_at = ? WHERE id = ?", number, ts, e.id);
     return { id: e.id, seq: v.seq, status: "updated" as const };
   });
 }

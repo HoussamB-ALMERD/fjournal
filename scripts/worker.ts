@@ -24,9 +24,9 @@ void (async () => {
     process.exit(1);
   }
   console.log(`Reproducibility worker ${worker} (Docker ${version}) waiting for runs…`);
-  recoverStaleRuns(worker);
+  await recoverStaleRuns(worker);
   while (!stopping) {
-    const next = claimNextRun(worker);
+    const next = await claimNextRun(worker);
     if (!next) {
       if (once) break;
       await new Promise((r) => setTimeout(r, 5000));

@@ -313,10 +313,13 @@ Anti-gaming (implemented / roadmap):
 
 ## 7. Technical stack
 - Next.js (App Router, Server Components, Server Actions), TypeScript, Tailwind.
-- SQLite via Node's built-in `node:sqlite` for zero-setup local development (no native
-  build step). The data layer is plain SQL in `src/lib/*`, so moving to Postgres (e.g. Neon)
-  is a mechanical port — and is required before serverless deployment, where local files
-  don't persist.
+- PostgreSQL: Neon in production (Vercel Marketplace), any Postgres locally. Plain SQL in
+  `src/lib/*` through `all`/`get`/`run`/`tx` in `src/lib/db.ts` (`node-postgres`, with Fluid
+  compute's `attachDatabasePool`). `tx()` carries its connection through AsyncLocalStorage and
+  takes a transaction-level advisory lock, so chain appends are serialised exactly as SQLite's
+  `BEGIN IMMEDIATE` did in the prototype. Schema migrations are versioned in `db.ts`, applied by
+  `npm run migrate` on every build over the direct connection. Type-aware lint rules
+  (`no-floating-promises`, `no-misused-promises`) make a forgotten `await` a build error.
 - Large files (datasets, PDFs) → object storage (roadmap); MVP stores links + checksums.
 
 ## 8. Strategy: becoming a structural threat

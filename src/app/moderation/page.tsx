@@ -14,8 +14,8 @@ const ACTION_STYLE = {
 
 export default async function ModerationLogPage() {
   const me = await currentUser();
-  const actions = listActions();
-  const stats = moderationStats();
+  const actions = await listActions();
+  const stats = await moderationStats();
 
   return (
     <div className="space-y-10">
@@ -26,7 +26,7 @@ export default async function ModerationLogPage() {
           public explanation and the evidence. Entries are never edited or deleted. Authors can appeal any decision, and a{" "}
           <em>different</em> moderator decides the appeal in public.
         </p>
-        {isModerator(me) && (
+        {(await isModerator(me)) && (
           <Link href="/moderation/queue" className="btn">
             Moderator queue ({stats.open_reports} reports, {stats.open_appeals} appeals)
           </Link>

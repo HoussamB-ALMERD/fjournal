@@ -9,16 +9,40 @@ Every design decision must serve it. [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.
 
 ## Quick start
 
-Requires Node.js 22.5+ (uses the built-in `node:sqlite`; no database server needed).
+Requires Node.js 22+ and PostgreSQL (Neon in production; any Postgres locally, e.g. in Docker).
 
 ```bash
+docker run -d --name fjournal-pg -e POSTGRES_PASSWORD=fjournal-local -e POSTGRES_DB=fjournal \
+  -p 54329:5432 postgres:17
+export DATABASE_URL=postgres://postgres:fjournal-local@localhost:54329/fjournal
 npm install
-npm run seed     # optional: demo users + contributions (password: fjournal-demo)
+npm run migrate  # creates the schema (the app also does this on first use)
+npm run seed     # optional, local only: demo users + contributions (password: fjournal-demo)
 npm run dev      # http://localhost:3000
 ```
 
-The database lives in `./data/fjournal.db`. Delete `./data` to start over. Set `FJOURNAL_DB`
-to use a different path.
+`npm run dev` reads `DATABASE_URL` from `.env.development.local` (gitignored), which takes precedence
+over the production credentials that `vercel env pull` writes to `.env.local`. Scripts (`seed`,
+`migrate`, `moderator`, `index`, `worker`) read only the shell environment. The seed refuses to run
+against anything but a local database: demo accounts share a published password.
+
+## Deploying (Vercel + Neon)
+
+The app runs on Vercel with Neon Postgres provisioned through the Vercel Marketplace
+(`vercel integration add neon`), which sets `DATABASE_URL` (pooled, used by the app) and
+`DATABASE_URL_UNPOOLED` (direct, used for migrations). Every build runs `npm run migrate` first
+(`vercel-build`). Writes that extend a hash chain take a transaction-level advisory lock, so the
+ledger stays strictly sequential under concurrency.
+
+Production starts empty, without demo accounts. To appoint the first moderators after they sign up,
+run the moderator script with the production URL in your shell (never commit it):
+
+```bash
+vercel env pull .env.production.local --environment=production
+DATABASE_URL="$(grep ^DATABASE_URL= .env.production.local | cut -d= -f2- | tr -d '"')" npm run moderator -- <handle>
+```
+
+The reproducibility worker and journal sweeps also run outside Vercel, with `DATABASE_URL` set.
 
 ## What's in the MVP
 
@@ -108,7 +132,7 @@ and more reliable). The demo seed imports four real papers when it has network a
 
 ## Roadmap (next priorities)
 
-1. Postgres (Neon) + object storage, so it can be deployed on serverless infrastructure.
+1. Object storage for datasets and PDFs (Postgres on Neon is done).
 2. DOIs per version of work published here (the DataCite plumbing for reviews is in place).
 3. Pushing reviews to ORCID's peer-review section (needs ORCID member API).
 4. Anchor the ledger head to OpenTimestamps.

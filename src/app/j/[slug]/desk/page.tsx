@@ -20,20 +20,20 @@ import { OrcidBadge, UserLink, timeAgo } from "@/components/ui";
 
 export async function generateMetadata({ params }: PageProps<"/j/[slug]/desk">): Promise<Metadata> {
   const { slug } = await params;
-  const c = getCollection(slug);
+  const c = await getCollection(slug);
   return c ? { title: `Editorial desk · ${c.name}` } : {};
 }
 
 export default async function DeskPage({ params, searchParams }: PageProps<"/j/[slug]/desk">) {
   const { slug } = await params;
   const { founded } = await searchParams;
-  const c = getCollection(slug);
+  const c = await getCollection(slug);
   if (!c) notFound();
   const me = await currentUser();
   if (!me) redirect(`/login?next=/j/${slug}/desk`);
-  const role = roleOf(c.id, me.id);
-  const board = boardOf(c.id);
-  const invitedMembers = boardOf(c.id, ["invited"]);
+  const role = await roleOf(c.id, me.id);
+  const board = await boardOf(c.id);
+  const invitedMembers = await boardOf(c.id, ["invited"]);
   const header = <CollectionHeader c={c} tab="desk" isBoard={!!role} board={board.length} verified={board.filter((m) => m.orcid).length} />;
 
   if (!role) {
@@ -59,8 +59,12 @@ export default async function DeskPage({ params, searchParams }: PageProps<"/j/[
   }
 
   const managing = role === "managing";
-  const pending = itemsOf(c.id, ["submitted"]);
-  const selected = itemsOf(c.id, ["selected"]);
+  const pending = await itemsOf(c.id, ["submitted"]);
+  // Works the viewer wrote can't be decided by them; known before rendering.
+  const ownWork = new Set(
+    (await Promise.all(pending.map(async (i) => ((await isAuthorOf(me.id, i.contribution_id)) ? i.contribution_id : null)))).filter(Boolean),
+  );
+  const selected = await itemsOf(c.id, ["selected"]);
 
   return (
     <div className="space-y-8">
@@ -81,7 +85,7 @@ export default async function DeskPage({ params, searchParams }: PageProps<"/j/[
             <h2 className="font-serif text-2xl font-semibold">Awaiting a decision ({pending.length})</h2>
             {pending.length === 0 && <p className="text-sm text-muted">Nothing waiting. Nominate work, or point authors to the collection.</p>}
             {pending.map((i) => {
-              const own = isAuthorOf(me.id, i.contribution_id);
+              const own = ownWork.has(i.contribution_id);
               return (
                 <article key={i.contribution_id} className="card space-y-3 p-5">
                   <div className="space-y-1">

@@ -22,24 +22,24 @@ const REP_LABEL: Record<string, string> = {
 
 export async function generateMetadata({ params }: PageProps<"/u/[handle]">) {
   const { handle } = await params;
-  const u = getUserByHandle(handle);
+  const u = await getUserByHandle(handle);
   return { title: u ? `${u.display_name} (@${u.handle})` : "Not found" };
 }
 
 export default async function ProfilePage({ params }: PageProps<"/u/[handle]">) {
   const { handle } = await params;
-  const u = getUserByHandle(handle);
+  const u = await getUserByHandle(handle);
   if (!u) notFound();
   const me = await currentUser();
-  const rep = reputationOf(u.id);
-  const breakdown = reputationBreakdown(u.id);
-  const works = feed({ owner: u.id, limit: 100 });
-  const reviews = reviewsBy(u.id);
+  const rep = await reputationOf(u.id);
+  const breakdown = await reputationBreakdown(u.id);
+  const works = await feed({ owner: u.id, limit: 100 });
+  const reviews = await reviewsBy(u.id);
   const helpful = reviews.reduce((s, r) => s + r.helpful, 0);
   const withDoi = reviews.filter((r) => r.doi_status === "registered").length;
-  const service = boardServiceOf(u.id);
-  const claimed = all<{ id: string; title: string; venue: string | null }>(
-    `SELECT c.id, v.title, json_extract(v.source, '$.venue') AS venue
+  const service = await boardServiceOf(u.id);
+  const claimed = await all<{ id: string; title: string; venue: string | null }>(
+    `SELECT c.id, v.title, v.source::jsonb ->> 'venue' AS venue
      FROM contribution_authors a JOIN contributions c ON c.id = a.contribution_id
      JOIN versions v ON v.contribution_id = c.id AND v.number = c.latest_version
      WHERE a.user_id = ? AND c.status <> 'hidden' ORDER BY a.created_at DESC`,

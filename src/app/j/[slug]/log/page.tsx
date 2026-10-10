@@ -9,7 +9,7 @@ import { UserLink, fmtDate } from "@/components/ui";
 
 export async function generateMetadata({ params }: PageProps<"/j/[slug]/log">): Promise<Metadata> {
   const { slug } = await params;
-  const c = getCollection(slug);
+  const c = await getCollection(slug);
   return c ? { title: `Log · ${c.name}` } : {};
 }
 
@@ -97,16 +97,16 @@ function Details({ e }: { e: LogEntry }) {
 
 export default async function CollectionLogPage({ params }: PageProps<"/j/[slug]/log">) {
   const { slug } = await params;
-  const c = getCollection(slug);
+  const c = await getCollection(slug);
   if (!c) notFound();
   const me = await currentUser();
-  const board = boardOf(c.id);
-  const entries = logOf(c.id);
-  const check = verifyLedger().collections;
+  const board = await boardOf(c.id);
+  const entries = await logOf(c.id);
+  const check = (await verifyLedger()).collections;
 
   return (
     <div className="space-y-8">
-      <CollectionHeader c={c} tab="log" isBoard={!!roleOf(c.id, me?.id)} board={board.length} verified={board.filter((m) => m.orcid).length} />
+      <CollectionHeader c={c} tab="log" isBoard={!!(await roleOf(c.id, me?.id))} board={board.length} verified={board.filter((m) => m.orcid).length} />
       <div className="max-w-3xl space-y-3">
         <p className="text-sm text-muted">
           Every change to the board and every editorial decision, newest first. Each entry is hashed into Fjournal&apos;s

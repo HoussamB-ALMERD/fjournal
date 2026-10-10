@@ -11,7 +11,7 @@ type State = { state: string; mode: "login" | "link"; next: string };
 export async function GET(req: Request) {
   const sp = new URL(req.url).searchParams;
   const jar = await cookies();
-  const st = unsign<State>(jar.get("fj_orcid_state")?.value);
+  const st = await unsign<State>(jar.get("fj_orcid_state")?.value);
   jar.set("fj_orcid_state", "", { path: "/auth/orcid", maxAge: 0 });
 
   // The state must match the one we issued, or anyone could log a victim into the attacker's account.
@@ -28,13 +28,13 @@ export async function GET(req: Request) {
   }
   if (!who) redirect(fail("failed"));
 
-  const owner = get<{ id: string }>("SELECT id FROM users WHERE orcid = ? AND orcid_verified_at IS NOT NULL", who.orcid);
+  const owner = await get<{ id: string }>("SELECT id FROM users WHERE orcid = ? AND orcid_verified_at IS NOT NULL", who.orcid);
 
   if (st.mode === "link") {
     const me = await currentUser();
     if (!me) redirect("/login?next=/settings");
     if (owner && owner.id !== me.id) redirect("/settings?orcid=taken");
-    run("UPDATE users SET orcid = ?, orcid_verified_at = ? WHERE id = ?", who.orcid, now(), me.id);
+    await run("UPDATE users SET orcid = ?, orcid_verified_at = ? WHERE id = ?", who.orcid, now(), me.id);
     redirect("/settings?orcid=linked");
   }
 
@@ -43,7 +43,7 @@ export async function GET(req: Request) {
     redirect(st.next);
   }
   // First visit: remember the verified iD briefly and let them choose a handle.
-  jar.set("fj_orcid_pending", sign(who, 900), {
+  jar.set("fj_orcid_pending", await sign(who, 900), {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",

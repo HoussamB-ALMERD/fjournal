@@ -5,7 +5,7 @@ import { normalizeIssn } from "@/lib/index/method";
 export async function GET(_: Request, ctx: RouteContext<"/api/journals/[issn]">) {
   const { issn: raw } = await ctx.params;
   const issn = normalizeIssn(raw);
-  const d = issn && indexPublic() ? journalPage(issn, false) : null;
+  const d = issn && indexPublic() ? await journalPage(issn, false) : null;
   if (!d) return Response.json({ error: "not found" }, { status: 404 });
   return Response.json({
     kind: "fjournal.journal-assessment/v1",

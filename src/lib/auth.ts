@@ -24,7 +24,7 @@ export type User = {
 export async function createSession(userId: string) {
   const id = randomBytes(32).toString("base64url");
   const expires = new Date(Date.now() + SESSION_DAYS * 86400_000);
-  run("INSERT INTO sessions (id, user_id, expires_at) VALUES (?,?,?)", id, userId, expires.toISOString());
+  await run("INSERT INTO sessions (id, user_id, expires_at) VALUES (?,?,?)", id, userId, expires.toISOString());
   (await cookies()).set(COOKIE, id, {
     httpOnly: true,
     sameSite: "lax",
@@ -37,7 +37,7 @@ export async function createSession(userId: string) {
 export async function destroySession() {
   const jar = await cookies();
   const id = jar.get(COOKIE)?.value;
-  if (id) run("DELETE FROM sessions WHERE id = ?", id);
+  if (id) await run("DELETE FROM sessions WHERE id = ?", id);
   jar.delete(COOKIE);
 }
 
@@ -45,13 +45,13 @@ export const currentUser = cache(async (): Promise<User | null> => {
   const id = (await cookies()).get(COOKIE)?.value;
   if (!id) return null;
   return (
-    get<User>(
+    (await get<User>(
       `SELECT u.id, u.handle, u.display_name, u.bio, u.affiliation, u.orcid, u.orcid_verified_at, u.created_at
        FROM sessions s JOIN users u ON u.id = s.user_id
        WHERE s.id = ? AND s.expires_at > ?`,
       id,
       now(),
-    ) ?? null
+    )) ?? null
   );
 });
 
