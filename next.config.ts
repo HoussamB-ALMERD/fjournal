@@ -1,9 +1,8 @@
 import type { NextConfig } from "next";
 
+// Every Fjournal page renders live community data (reviews, votes, versions),
+// so we use request-time rendering rather than Cache Components for now.
 const nextConfig: NextConfig = {
-  /* config options here */
-  cacheComponents: true,
-  partialPrefetching: true,
   turbopack: {
     rules: {
       "*.css": {

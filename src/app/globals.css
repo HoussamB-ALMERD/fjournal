@@ -1,26 +1,109 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --paper: #fbfaf7;
+  --surface: #ffffff;
+  --ink: #16181d;
+  --muted: #5c6370;
+  --line: #e4e1da;
+  --accent: #c2410c;
+  --accent-ink: #ffffff;
+  --accent-soft: #fff1e8;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --paper: #0f1115;
+    --surface: #171a20;
+    --ink: #e8e6e1;
+    --muted: #9aa1ad;
+    --line: #2a2e36;
+    --accent: #fb7a3c;
+    --accent-ink: #1a0d05;
+    --accent-soft: #2a1a10;
   }
 }
 
+@theme inline {
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-serif: var(--font-serif);
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.input {
+  @apply w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink outline-none transition
+    placeholder:text-muted/70 focus:border-accent focus:ring-2 focus:ring-accent/20;
+}
+.label {
+  @apply mb-1 block text-sm font-medium;
+}
+.hint {
+  @apply mt-1 text-xs text-muted;
+}
+.btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-ink
+    transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50;
+}
+.btn-ghost {
+  @apply inline-flex items-center justify-center gap-2 rounded-md border border-line bg-surface px-3 py-1.5 text-sm
+    font-medium transition hover:border-ink/40 disabled:opacity-50;
+}
+.card {
+  @apply rounded-lg border border-line bg-surface;
+}
+.hash {
+  @apply font-mono text-xs break-all text-muted;
+}
+
+/* Rendered manuscript markdown */
+.prose-fj {
+  @apply max-w-none text-[15.5px] leading-7;
+}
+.prose-fj h1 { @apply mt-8 mb-3 font-serif text-2xl font-semibold; }
+.prose-fj h2 { @apply mt-8 mb-3 font-serif text-xl font-semibold; }
+.prose-fj h3 { @apply mt-6 mb-2 text-base font-semibold; }
+.prose-fj p { @apply my-3; }
+.prose-fj ul { @apply my-3 list-disc pl-6; }
+.prose-fj ol { @apply my-3 list-decimal pl-6; }
+.prose-fj li { @apply my-1; }
+.prose-fj a { @apply text-accent underline underline-offset-2; }
+.prose-fj blockquote { @apply my-4 border-l-4 border-line pl-4 text-muted; }
+.prose-fj code { @apply rounded bg-line/50 px-1 py-0.5 font-mono text-[13px]; }
+.prose-fj pre { @apply my-4 overflow-x-auto rounded-md border border-line bg-paper p-4; }
+.prose-fj pre code { @apply bg-transparent p-0; }
+.prose-fj table { @apply my-4 block w-full overflow-x-auto border-collapse text-sm; }
+.prose-fj th, .prose-fj td { @apply border border-line px-3 py-1.5 text-left; }
+.prose-fj img { @apply my-4 max-w-full rounded; }
+.prose-fj hr { @apply my-8 border-line; }
+.prose-fj .katex-display { @apply overflow-x-auto overflow-y-hidden py-1; }
+
+/* Scrutiny reports print on one A4 page, in light colours whatever the screen theme. */
+@media print {
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+  :root {
+    --paper: #ffffff;
+    --surface: #ffffff;
+    --ink: #111111;
+    --muted: #4b5058;
+    --line: #d4d1ca;
+  }
+  .report a {
+    color: inherit;
+  }
 }
