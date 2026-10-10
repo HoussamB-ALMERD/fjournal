@@ -28,7 +28,8 @@ against anything but a local database: demo accounts share a published password.
 
 ## Deploying (Vercel + Neon)
 
-The app runs on Vercel with Neon Postgres provisioned through the Vercel Marketplace
+The app runs on Vercel, connected to this GitHub repository: every push to `main` deploys to production
+and every other branch or pull request gets a preview deployment. Neon Postgres is provisioned through the Vercel Marketplace
 (`vercel integration add neon`), which sets `DATABASE_URL` (pooled, used by the app) and
 `DATABASE_URL_UNPOOLED` (direct, used for migrations). Every build runs `npm run migrate` first
 (`vercel-build`). Writes that extend a hash chain take a transaction-level advisory lock, so the
