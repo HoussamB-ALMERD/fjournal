@@ -11,6 +11,7 @@
   --accent: #16613f;
   --accent-ink: #ffffff;
   --accent-soft: #eaf3ee;
+  --brand: #c4271c;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -24,6 +25,7 @@
     --accent: #6cc196;
     --accent-ink: #0b1a12;
     --accent-soft: #15261d;
+    --brand: #f0675c;
   }
 }
 
@@ -37,6 +39,7 @@
   --color-accent: var(--accent);
   --color-accent-ink: var(--accent-ink);
   --color-accent-soft: var(--accent-soft);
+  --color-brand: var(--brand);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-serif: var(--font-serif);

@@ -27,7 +27,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         <header className="sticky top-0 z-10 border-b border-line bg-paper print:hidden">
           <div className="mx-auto flex h-14 max-w-6xl items-center gap-8 px-4 sm:px-6">
             <Link href="/" className="font-serif text-[1.35rem] font-semibold tracking-[-0.02em]">
-              Fjournal
+              <span className="text-brand">F</span>journal
             </Link>
             <nav aria-label="Main" className="hidden gap-6 text-sm text-muted md:flex">
               <Link href="/" className="transition-colors hover:text-ink">Explore</Link>
@@ -62,7 +62,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         <footer className="mt-16 border-t border-line print:hidden">
           <div className="mx-auto grid max-w-6xl gap-10 px-4 py-12 text-sm sm:grid-cols-2 sm:px-6 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
             <div>
-              <p className="font-serif text-lg font-semibold">Fjournal</p>
+              <p className="font-serif text-lg font-semibold"><span className="text-brand">F</span>journal</p>
               <p className="mt-2 max-w-xs leading-relaxed text-muted">
                 No author fees, no reader fees. Authors keep their copyright, and every decision is on a public ledger.
               </p>
