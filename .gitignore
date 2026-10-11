@@ -47,3 +47,6 @@ next-env.d.ts
 /.agents/
 /.claude/
 skills-lock.json
+
+# Playwright MCP screenshots and logs
+/.playwright-mcp/

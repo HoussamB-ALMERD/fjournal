@@ -49,13 +49,14 @@ export default async function CollectionPage({ params }: PageProps<"/j/[slug]">)
             {selected.length === 0 ? (
               <p className="card p-6 text-sm text-muted">Nothing selected yet. Every decision will appear here and in the public log.</p>
             ) : (
-              selected.map((it) => {
+              <div className="divide-y divide-line border-y border-line">
+              {selected.map((it) => {
                 const d = decisions.get(it.id);
                 return (
-                  <div key={it.id} className="space-y-1">
+                  <div key={it.id}>
                     <FeedCard item={it} />
                     {d && (
-                      <p className="px-2 text-xs text-muted">
+                      <p className="-mt-3 pb-5 text-xs text-muted">
                         Selected v{d.version_number}
                         {d.version_number < it.latest_version && ` (v${it.latest_version} posted since)`} by{" "}
                         {d.decided_by_handle && <UserLink handle={d.decided_by_handle} name={d.decided_by_name ?? undefined} />}
@@ -65,7 +66,8 @@ export default async function CollectionPage({ params }: PageProps<"/j/[slug]">)
                     )}
                   </div>
                 );
-              })
+              })}
+              </div>
             )}
           </section>
 

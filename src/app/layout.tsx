@@ -21,46 +21,73 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} ${serif.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col font-sans">
-        <header className="sticky top-0 z-10 border-b border-line bg-paper/90 backdrop-blur print:hidden">
-          <div className="mx-auto flex h-14 max-w-6xl items-center gap-6 px-4">
-            <Link href="/" className="font-serif text-xl font-bold tracking-tight">
-              F<span className="text-accent">journal</span>
+        <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-20 focus:rounded focus:bg-ink focus:px-3 focus:py-2 focus:text-paper">
+          Skip to content
+        </a>
+        <header className="sticky top-0 z-10 border-b border-line bg-paper print:hidden">
+          <div className="mx-auto flex h-14 max-w-6xl items-center gap-8 px-4 sm:px-6">
+            <Link href="/" className="font-serif text-[1.35rem] font-semibold tracking-[-0.02em]">
+              Fjournal
             </Link>
-            <nav className="hidden gap-5 text-sm text-muted sm:flex">
-              <Link href="/" className="hover:text-ink">Explore</Link>
-              <Link href="/import" className="hover:text-ink">Review any paper</Link>
-              <Link href="/collections" className="hover:text-ink">Collections</Link>
-              <Link href="/manifesto" className="hover:text-ink">Why we exist</Link>
-              <Link href="/ledger" className="hover:text-ink">Ledger</Link>
-              <Link href="/about" className="hover:text-ink">How it works</Link>
+            <nav aria-label="Main" className="hidden gap-6 text-sm text-muted md:flex">
+              <Link href="/" className="transition-colors hover:text-ink">Explore</Link>
+              <Link href="/collections" className="transition-colors hover:text-ink">Collections</Link>
+              <Link href="/import" className="transition-colors hover:text-ink">Review a paper</Link>
+              <Link href="/ledger" className="transition-colors hover:text-ink">Ledger</Link>
+              <Link href="/about" className="transition-colors hover:text-ink">How it works</Link>
             </nav>
-            <div className="ml-auto flex items-center gap-3 text-sm">
-              <Link href="/submit" className="btn py-1.5">Submit work</Link>
+            <div className="ml-auto flex items-center gap-5 text-sm">
               {me ? (
                 <>
-                  <Link href={`/u/${me.handle}`} className="font-medium hover:text-accent">@{me.handle}</Link>
+                  <Link href={`/u/${me.handle}`} className="hidden font-medium hover:underline sm:inline">@{me.handle}</Link>
                   <form action={logout}>
-                    <button className="text-muted hover:text-ink">Sign out</button>
+                    <button className="text-muted transition-colors hover:text-ink">Sign out</button>
                   </form>
                 </>
               ) : (
-                <Link href="/login" className="font-medium hover:text-accent">Sign in</Link>
+                <Link href="/login" className="text-muted transition-colors hover:text-ink">Sign in</Link>
               )}
+              <Link href="/submit" className="btn h-8 px-3">Submit</Link>
             </div>
           </div>
+          <nav aria-label="Main" className="flex gap-5 overflow-x-auto border-t border-line px-4 py-2.5 text-sm whitespace-nowrap text-muted [scrollbar-width:none] md:hidden">
+            <Link href="/">Explore</Link>
+            <Link href="/collections">Collections</Link>
+            <Link href="/import">Review a paper</Link>
+            <Link href="/ledger">Ledger</Link>
+            <Link href="/about">How it works</Link>
+          </nav>
         </header>
-        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 print:max-w-none print:p-0">{children}</main>
-        <footer className="border-t border-line py-6 text-center text-xs text-muted print:hidden">
-          Fjournal · Zero author fees. Zero reader fees. Authors keep their copyright. ·{" "}
-          <Link href="/moderation" className="underline">Moderation log</Link> ·{" "}
-          <Link href="/tools/check" className="underline">Statistics checker</Link> ·{" "}
-          <Link href="/tools/reproduce" className="underline">Reproducibility bot</Link> ·{" "}
-          <Link href="/journals" className="underline">Journal Integrity Index</Link> ·{" "}
-          <Link href="/api/contributions" className="underline">Open API</Link> ·{" "}
-          <Link href="/api/ledger" className="underline">Ledger export</Link> ·{" "}
-          <Link href="/api/collections" className="underline">Collections API</Link>
+        <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6 print:max-w-none print:p-0">{children}</main>
+        <footer className="mt-16 border-t border-line print:hidden">
+          <div className="mx-auto grid max-w-6xl gap-10 px-4 py-12 text-sm sm:grid-cols-2 sm:px-6 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
+            <div>
+              <p className="font-serif text-lg font-semibold">Fjournal</p>
+              <p className="mt-2 max-w-xs leading-relaxed text-muted">
+                No author fees, no reader fees. Authors keep their copyright, and every decision is on a public ledger.
+              </p>
+            </div>
+            <FooterCol title="Platform" links={[["Why we exist", "/manifesto"], ["How it works", "/about"], ["Moderation log", "/moderation"], ["Ledger", "/ledger"]]} />
+            <FooterCol title="Tools" links={[["Statistics checker", "/tools/check"], ["Reproducibility bot", "/tools/reproduce"], ["Journal Integrity Index", "/journals"]]} />
+            <FooterCol title="Open data" links={[["Contributions API", "/api/contributions"], ["Ledger export", "/api/ledger"], ["Collections API", "/api/collections"]]} />
+          </div>
         </footer>
       </body>
     </html>
+  );
+}
+
+function FooterCol({ title, links }: { title: string; links: [string, string][] }) {
+  return (
+    <div>
+      <p className="kicker">{title}</p>
+      <ul className="mt-3 space-y-2">
+        {links.map(([label, href]) => (
+          <li key={href}>
+            <Link href={href} className="text-muted transition-colors hover:text-ink">{label}</Link>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

@@ -29,25 +29,18 @@ export function timeAgo(iso: string): string {
 export const fmtDate = (iso: string) =>
   new Date(iso).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" }) + " UTC";
 
+/** Replications and negative results are first-class, so they get the accent; everything else stays ink. */
 const TYPE_STYLE: Partial<Record<ContributionType, string>> = {
-  replication: "bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300",
-  negative_result: "bg-slate-200 text-slate-800 dark:bg-slate-800 dark:text-slate-200",
+  replication: "text-accent",
+  negative_result: "text-accent",
 };
 
 export function TypeTag({ type }: { type: ContributionType }) {
-  return (
-    <span
-      className={`rounded px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${
-        TYPE_STYLE[type] ?? "bg-accent-soft text-accent"
-      }`}
-    >
-      {CONTRIBUTION_TYPES[type].label}
-    </span>
-  );
+  return <span className={`kicker ${TYPE_STYLE[type] ?? "text-ink"}`}>{CONTRIBUTION_TYPES[type].label}</span>;
 }
 
 export function LicenseTag({ license, source }: { license: License; source?: SourceRecord | null }) {
-  const cls = "rounded border border-line px-1.5 py-0.5 text-[11px] text-muted";
+  const cls = "text-xs text-muted";
   if (license === "EXTERNAL" && source) {
     const label = licenseLabelFromUrl(source.license_url);
     return source.license_url ? (
@@ -68,19 +61,19 @@ export function LicenseTag({ license, source }: { license: License; source?: Sou
   );
 }
 
-const BADGE_STYLE: Record<BadgeT["key"], string> = {
-  open: "border-emerald-600/40 bg-emerald-50 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
-  computed: "border-teal-600/50 bg-teal-50 text-teal-800 dark:bg-teal-950 dark:text-teal-300",
-  scrutinized: "border-blue-600/40 bg-blue-50 text-blue-800 dark:bg-blue-950 dark:text-blue-300",
-  replicated: "border-violet-600/40 bg-violet-50 text-violet-800 dark:bg-violet-950 dark:text-violet-300",
-  contested: "border-amber-600/40 bg-amber-50 text-amber-800 dark:bg-amber-950 dark:text-amber-300",
-};
-
+/** Earned badges read as one quiet family; only "Contested" is a warning, so only it changes colour. */
 export function Badges({ badges }: { badges: BadgeT[] }) {
   return (
     <>
       {badges.map((b) => (
-        <span key={b.key} title={b.rule} className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${BADGE_STYLE[b.key]}`}>
+        <span
+          key={b.key}
+          title={b.rule}
+          className={`inline-flex items-center gap-1 text-xs font-medium ${
+            b.key === "contested" ? "text-amber-700 dark:text-amber-400" : "text-ink"
+          }`}
+        >
+          <span aria-hidden className={b.key === "contested" ? "" : "text-accent"}>{b.key === "contested" ? "!" : "✓"}</span>
           {b.label}
         </span>
       ))}
@@ -90,16 +83,18 @@ export function Badges({ badges }: { badges: BadgeT[] }) {
 
 export function ScrutinyLine({ s }: { s: Scrutiny }) {
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
-      <span>{s.reviewCount} review{s.reviewCount === 1 ? "" : "s"}</span>
-      {s.soundness !== null && <span>soundness {s.soundness.toFixed(1)}/5</span>}
-      <span>
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted tabular-nums">
+      <span className={s.reviewCount ? "text-ink" : ""}>
+        {s.reviewCount} review{s.reviewCount === 1 ? "" : "s"}
+        {s.soundness !== null && <span className="text-muted"> · soundness {s.soundness.toFixed(1)}</span>}
+      </span>
+      <span className={s.reproduced + s.partial + s.failed ? "text-ink" : ""}>
         {s.reproduced + s.partial + s.failed} replication{s.reproduced + s.partial + s.failed === 1 ? "" : "s"}
       </span>
       <span>{s.endorsements} endorsement{s.endorsements === 1 ? "" : "s"}</span>
       <span>v{s.versions}</span>
-      <span className={s.hasData ? "text-ink" : "line-through opacity-60"}>data</span>
-      <span className={s.hasCode ? "text-ink" : "line-through opacity-60"}>code</span>
+      <span className={s.hasData ? "text-ink" : "text-faint"}>{s.hasData ? "Data" : "No data"}</span>
+      <span className={s.hasCode ? "text-ink" : "text-faint"}>{s.hasCode ? "Code" : "No code"}</span>
     </div>
   );
 }
@@ -130,19 +125,16 @@ export const seriousNotices = (s: SourceRecord) =>
 
 export function SourceTag({ source }: { source: SourceRecord }) {
   return (
-    <span
-      title="Published elsewhere and opened for review on Fjournal"
-      className="rounded border border-amber-600/40 bg-amber-50 px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-900 dark:bg-amber-950 dark:text-amber-200"
-    >
-      Imported · {venueName(source)}
+    <span title="Published elsewhere and opened for review on Fjournal" className="text-xs text-muted">
+      Imported from <span className="text-ink">{venueName(source)}</span>
     </span>
   );
 }
 
 export function NoticeTag({ type }: { type: string }) {
   return (
-    <span className="rounded-full bg-red-700 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white">
-      Publisher: {type.replace(/[_-]/g, " ")}
+    <span className="kicker text-red-700 dark:text-red-400">
+      {type.replace(/[_-]/g, " ")} · per publisher
     </span>
   );
 }
@@ -153,9 +145,9 @@ export function CollectionChip({ c }: { c: { slug: string; name: string; accent:
     <Link
       href={`/j/${c.slug}`}
       title={`Selected by the editorial board of ${c.name}. Read their reasoning in the collection's public log.`}
-      className="inline-flex items-center gap-1 rounded border border-line px-1.5 py-0.5 text-[11px] font-medium hover:border-ink/40"
+      className="inline-flex items-center gap-1.5 text-xs font-medium hover:underline"
     >
-      <span className="h-2 w-2 rounded-full" style={{ background: c.accent }} aria-hidden />
+      <span className="h-2 w-2 rounded-[2px]" style={{ background: c.accent }} aria-hidden />
       Selected · {c.name}
     </Link>
   );

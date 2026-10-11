@@ -130,12 +130,12 @@ export default async function ContributionPage({ params, searchParams }: PagePro
     <div className="grid gap-10 lg:grid-cols-[1fr_300px]">
       <article className="min-w-0 space-y-8">
         <header className="space-y-3">
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <TypeTag type={c.type} />
             {src && <SourceTag source={src} />}
             {serious.map((n) => <NoticeTag key={n.url} type={n.type} />)}
             {c.status === "retracted" ? (
-              <span className="rounded-full bg-red-700 px-2 py-0.5 text-[11px] font-bold tracking-wide text-white">RETRACTED</span>
+              <span className="kicker text-red-700 dark:text-red-400">Retracted</span>
             ) : (
               <Badges badges={s.badges} />
             )}
@@ -254,12 +254,12 @@ export default async function ContributionPage({ params, searchParams }: PagePro
             {replications.map((r) => (
               <div key={r.id} className="flex items-center gap-3 px-4 py-3 text-sm">
                 <span
-                  className={`rounded px-2 py-0.5 text-xs font-semibold ${
+                  className={`w-28 shrink-0 text-xs font-semibold ${
                     r.replication_outcome === "reproduced"
-                      ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                      ? "text-accent"
                       : r.replication_outcome === "failed"
-                        ? "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300"
-                        : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                        ? "text-red-700 dark:text-red-400"
+                        : "text-amber-700 dark:text-amber-400"
                   }`}
                 >
                   {r.replication_outcome ? REPLICATION_OUTCOMES[r.replication_outcome] : "—"}
@@ -374,7 +374,7 @@ export default async function ContributionPage({ params, searchParams }: PagePro
                 <UserLink handle={r.reviewer_handle} name={r.reviewer_name} />
                 <span className="text-xs text-muted">on v{r.version_number}{r.version_number !== c.latest_version && " (earlier version)"} · {timeAgo(r.created_at)}</span>
                 {r.reviewer_orcid && <OrcidBadge orcid={r.reviewer_orcid} />}
-                <span className="ml-auto rounded-full border border-line px-2 py-0.5 text-xs font-semibold">
+                <span className="ml-auto text-xs font-semibold">
                   {RECOMMENDATIONS[r.recommendation]}
                 </span>
               </div>
@@ -467,9 +467,9 @@ export default async function ContributionPage({ params, searchParams }: PagePro
         </section>
       </article>
 
-      <aside className="space-y-5 lg:sticky lg:top-20 lg:self-start">
-        <div className="card space-y-3 p-5">
-          <h2 className="text-sm font-semibold">Scrutiny record</h2>
+      <aside className="space-y-8 text-sm lg:sticky lg:top-20 lg:self-start">
+        <div className="border-t border-ink pt-3 space-y-3">
+          <h2 className="kicker text-ink">Scrutiny record</h2>
           <dl className="grid grid-cols-2 gap-y-2 text-sm">
             <dt className="text-muted">Reviews</dt>
             <dd className="text-right">{s.reviewCount} ({s.distinctReviewers} people)</dd>
@@ -511,7 +511,7 @@ export default async function ContributionPage({ params, searchParams }: PagePro
           </details>
         </div>
 
-        <div className="card space-y-2 p-5">
+        <div className="border-t border-ink pt-3 space-y-2">
           {isOwner && (
             <Link href={`/c/${id}/edit`} className="btn w-full">Post a new version</Link>
           )}
@@ -545,8 +545,8 @@ export default async function ContributionPage({ params, searchParams }: PagePro
         </div>
 
         {(inCollections.length > 0 || submittable.length > 0) && (
-          <div className="card space-y-3 p-5" id="collections">
-            <h2 className="text-sm font-semibold">Collections</h2>
+          <div className="border-t border-ink pt-3 space-y-3" id="collections">
+            <h2 className="kicker text-ink">Collections</h2>
             {inCollections.length > 0 && (
               <ul className="space-y-3 text-sm">
                 {inCollections.map((x) => (
@@ -576,8 +576,8 @@ export default async function ContributionPage({ params, searchParams }: PagePro
           </div>
         )}
 
-        <div className="card p-5">
-          <h2 className="mb-3 text-sm font-semibold">Version history</h2>
+        <div className="border-t border-ink pt-3">
+          <h2 className="kicker mb-3 text-ink">Version history</h2>
           <ol className="space-y-3">
             {versions.map((ver) => (
               <li key={ver.number} className="text-sm">
@@ -595,8 +595,8 @@ export default async function ContributionPage({ params, searchParams }: PagePro
           </ol>
         </div>
 
-        <div className="card space-y-2 p-5">
-          <h2 className="text-sm font-semibold">Cite this version</h2>
+        <div className="border-t border-ink pt-3 space-y-2">
+          <h2 className="kicker text-ink">Cite this version</h2>
           {src ? (
             <>
               <p className="select-all rounded bg-paper p-2 font-mono text-[11px] leading-5">

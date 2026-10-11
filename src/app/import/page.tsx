@@ -80,9 +80,11 @@ export default async function ImportPage({ searchParams }: PageProps<"/import">)
       {recent.length > 0 && (
         <section className="space-y-4">
           <h2 className="font-serif text-2xl font-semibold">Recently opened for review</h2>
-          {recent.map((it) => (
-            <FeedCard key={it.id} item={it} />
-          ))}
+          <div className="divide-y divide-line border-y border-line">
+            {recent.map((it) => (
+              <FeedCard key={it.id} item={it} />
+            ))}
+          </div>
         </section>
       )}
     </div>

@@ -48,7 +48,7 @@ export default async function ProfilePage({ params }: PageProps<"/u/[handle]">) 
 
   return (
     <div className="grid gap-10 lg:grid-cols-[300px_1fr]">
-      <aside className="space-y-5">
+      <aside className="space-y-8">
         <div className="space-y-2">
           <h1 className="font-serif text-3xl font-bold">{u.display_name}</h1>
           <p className="text-muted">@{u.handle}</p>
@@ -67,9 +67,9 @@ export default async function ProfilePage({ params }: PageProps<"/u/[handle]">) 
           {me?.id === u.id && <Link href="/settings" className="btn-ghost">Edit profile</Link>}
         </div>
 
-        <div className="card p-5">
+        <div className="border-t border-ink pt-3">
           <div className="flex items-baseline justify-between">
-            <h2 className="text-sm font-semibold">Reputation</h2>
+            <h2 className="kicker text-ink">Reputation</h2>
             <span className="font-serif text-3xl font-semibold">{Math.round(rep)}</span>
           </div>
           <p className="mt-1 text-xs text-muted">Earned only through contributions, helpful reviews and replications.</p>
@@ -86,8 +86,8 @@ export default async function ProfilePage({ params }: PageProps<"/u/[handle]">) 
         </div>
 
         {service.length > 0 && (
-          <div className="card p-5 text-sm">
-            <h2 className="mb-2 font-semibold">Editorial boards</h2>
+          <div className="border-t border-ink pt-3 text-sm">
+            <h2 className="kicker mb-2 text-ink">Editorial boards</h2>
             <ul className="space-y-2">
               {service.map((s) => (
                 <li key={s.slug}>
@@ -101,8 +101,8 @@ export default async function ProfilePage({ params }: PageProps<"/u/[handle]">) 
           </div>
         )}
 
-        <div className="card p-5 text-sm">
-          <h2 className="mb-2 font-semibold">Scrutiny report</h2>
+        <div className="border-t border-ink pt-3 text-sm">
+          <h2 className="kicker mb-2 text-ink">Scrutiny report</h2>
           <ul className="space-y-1 text-muted">
             <li>{works.length} contributions</li>
             <li>{works.filter((w) => w.type === "replication").length} replications performed</li>
@@ -121,7 +121,7 @@ export default async function ProfilePage({ params }: PageProps<"/u/[handle]">) 
       <div className="min-w-0 space-y-10">
         <section className="space-y-4">
           <h2 className="font-serif text-xl font-semibold">Contributions</h2>
-          {works.length === 0 ? <p className="text-sm text-muted">Nothing published yet.</p> : works.map((w) => <FeedCard key={w.id} item={w} />)}
+          {works.length === 0 ? <p className="text-sm text-muted">Nothing published yet.</p> : <div className="divide-y divide-line border-y border-line">{works.map((w) => <FeedCard key={w.id} item={w} />)}</div>}
         </section>
         {claimed.length > 0 && (
           <section className="space-y-3">

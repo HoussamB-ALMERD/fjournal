@@ -28,103 +28,118 @@ export default async function Home({ searchParams }: PageProps<"/">) {
     return s ? `/?${s}` : "/";
   };
 
+  const figures: [string, number | string][] = [
+    ["Contributions", stats.contributions],
+    ["Public reviews", stats.reviews],
+    ["Replications", stats.replications],
+    ["Versions on the ledger", stats.versions],
+    ["Fees, to anyone", "$0"],
+  ];
+
   return (
-    <div className="space-y-10">
-      <section className="grid gap-8 border-b border-line pb-10 lg:grid-cols-[1fr_320px]">
-        <div>
-          <h1 className="font-serif text-4xl font-bold leading-tight tracking-tight sm:text-5xl">
-            Science, judged in the open.
-          </h1>
-          <p className="mt-4 max-w-2xl text-lg leading-8 text-muted">
-            Publish in minutes. Keep your copyright. Get evaluated by the whole community — not by three anonymous
-            gatekeepers. Replications and negative results count. No degree required. No fees, ever. Science belongs to the people who do it — not to the publishers who sell it back to them.
-          </p>
-          <div className="mt-6 flex flex-wrap gap-3">
-            <Link href="/submit" className="btn">Publish your work</Link>
-            <Link href="/import" className="btn-ghost">Review any paper, from any journal</Link>
-            <Link href="/manifesto" className="btn-ghost">Why we exist</Link>
-          </div>
+    <div>
+      <section className="pt-6 pb-12 sm:pt-10">
+        <p className="kicker">An open journal for every field</p>
+        <h1 className="mt-4 max-w-4xl font-serif text-[2.6rem] leading-[1.05] font-semibold tracking-[-0.02em] text-balance sm:text-6xl">
+          Science, judged in the open.
+        </h1>
+        <p className="mt-6 max-w-2xl text-lg leading-relaxed text-ink/80">
+          Publish in minutes and keep your copyright. Every review is public, signed and versioned, and replications and
+          negative results count as much as new findings. No fees for authors or readers, and no credentials required.
+        </p>
+        <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3">
+          <Link href="/submit" className="btn h-10 px-5">Publish your work</Link>
+          <Link href="/import" className="link text-sm font-medium">Review a paper from any journal</Link>
+          <Link href="/manifesto" className="link text-sm text-muted">Why we exist</Link>
         </div>
-        <dl className="card grid grid-cols-2 gap-4 self-start p-5 text-center">
-          {[
-            ["Contributions", stats.contributions],
-            ["Versions", stats.versions],
-            ["Public reviews", stats.reviews],
-            ["Replications", stats.replications],
-          ].map(([k, v]) => (
-            <div key={k}>
-              <dd className="font-serif text-3xl font-semibold">{v}</dd>
-              <dt className="text-xs text-muted">{k}</dt>
-            </div>
-          ))}
-          <p className="col-span-2 border-t border-line pt-3 text-xs text-muted">
-            Fees paid by authors: <strong className="text-ink">$0</strong> · by readers: <strong className="text-ink">$0</strong>
-          </p>
-        </dl>
       </section>
 
-      <div className="grid gap-8 lg:grid-cols-[1fr_260px]">
-        <section className="min-w-0 space-y-4">
-          <div className="flex flex-wrap items-center gap-2 border-b border-line">
-            {TABS.map((t) => (
-              <Link
-                key={t.key}
-                href={href({ sort: t.key })}
-                className={`-mb-px border-b-2 px-3 py-2 text-sm ${sort === t.key ? "border-accent font-semibold" : "border-transparent text-muted hover:text-ink"}`}
-              >
-                {t.label}
-              </Link>
-            ))}
+      <dl className="grid grid-cols-2 gap-px border-y border-line bg-line sm:grid-cols-5">
+        {figures.map(([k, v]) => (
+          <div key={k} className="bg-paper py-5 pr-4 sm:pl-5 sm:first:pl-0 max-sm:even:pl-5 max-sm:last:col-span-2">
+            <dd className="font-serif text-3xl font-semibold tabular-nums">{v}</dd>
+            <dt className="mt-1 text-xs text-muted">{k}</dt>
           </div>
-          <form className="flex gap-2" action="/">
+        ))}
+      </dl>
+
+      <div className="mt-12 grid gap-12 lg:grid-cols-[minmax(0,1fr)_240px]">
+        <section className="min-w-0">
+          <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+            <nav aria-label="Sort" className="-mb-px flex flex-wrap gap-x-6 gap-y-1">
+              {TABS.map((t) => (
+                <Link
+                  key={t.key}
+                  href={href({ sort: t.key })}
+                  aria-current={sort === t.key ? "page" : undefined}
+                  className={`border-b-2 pb-2 text-sm transition-colors ${sort === t.key ? "border-ink font-medium text-ink" : "border-transparent text-muted hover:text-ink"}`}
+                >
+                  {t.label}
+                </Link>
+              ))}
+            </nav>
+          </div>
+          <form className="mt-5 flex flex-col gap-2 sm:flex-row" action="/" role="search">
             {sort !== "latest" && <input type="hidden" name="sort" value={sort} />}
-            <input className="input" name="q" defaultValue={q} placeholder="Search titles, abstracts, authors…" />
-            <select className="input w-48" name="type" defaultValue={type ?? ""}>
+            <label className="sr-only" htmlFor="feed-q">Search</label>
+            <input id="feed-q" className="input min-w-0 sm:flex-1" type="search" name="q" defaultValue={q} placeholder="Search titles, abstracts, authors" />
+            <label className="sr-only" htmlFor="feed-type">Type</label>
+            <select id="feed-type" className="input sm:w-40" name="type" defaultValue={type ?? ""}>
               <option value="">All types</option>
               {Object.entries(CONTRIBUTION_TYPES).map(([k, v]) => (
                 <option key={k} value={k}>{v.label}</option>
               ))}
             </select>
-            <select className="input w-44" name="origin" defaultValue={origin ?? ""}>
+            <label className="sr-only" htmlFor="feed-origin">Origin</label>
+            <select id="feed-origin" className="input sm:w-44" name="origin" defaultValue={origin ?? ""}>
               <option value="">All origins</option>
               <option value="fjournal">Published here</option>
               <option value="imported">Imported for review</option>
             </select>
-            <button className="btn-ghost">Filter</button>
+            <button className="btn-ghost">Search</button>
           </form>
           {items.length === 0 ? (
-            <div className="card p-10 text-center text-muted">
-              Nothing here yet. <Link href="/submit" className="text-accent underline">Be the first to publish.</Link>
+            <div className="mt-6 border-y border-line py-12">
+              <p className="font-serif text-xl">{q || type || origin ? "Nothing matches that search." : "Nothing published yet."}</p>
+              <p className="mt-2 text-sm text-muted">
+                {q || type || origin ? (
+                  <Link href="/" className="link">Clear the filters</Link>
+                ) : (
+                  <>Publish the first paper, or <Link href="/import" className="link">open an existing one for review</Link>.</>
+                )}
+              </p>
             </div>
           ) : (
-            items.map((it) => <FeedCard key={it.id} item={it} />)
+            <div className="mt-6 divide-y divide-line border-y border-line">
+              {items.map((it) => <FeedCard key={it.id} item={it} />)}
+            </div>
           )}
         </section>
 
-        <aside className="space-y-6">
-          <div className="card p-5">
-            <h2 className="mb-3 text-sm font-semibold">Top contributors</h2>
+        <aside className="space-y-10 text-sm lg:pt-1">
+          <section>
+            <h2 className="kicker border-b border-line pb-2">Top contributors</h2>
             {top.length === 0 ? (
-              <p className="text-sm text-muted">Reputation is earned by publishing, reviewing well and replicating.</p>
+              <p className="mt-3 text-muted">Reputation is earned by publishing, reviewing well and replicating.</p>
             ) : (
-              <ol className="space-y-2 text-sm">
+              <ol className="mt-2">
                 {top.map((u, i) => (
-                  <li key={u.handle} className="flex items-center gap-2">
-                    <span className="w-4 text-xs text-muted">{i + 1}</span>
-                    <Link href={`/u/${u.handle}`} className="truncate hover:text-accent">{u.display_name}</Link>
-                    <span className="ml-auto font-mono text-xs text-muted">{u.rep}</span>
+                  <li key={u.handle} className="flex items-baseline gap-3 py-1.5">
+                    <span className="w-4 text-xs text-faint tabular-nums">{i + 1}</span>
+                    <Link href={`/u/${u.handle}`} className="truncate hover:underline">{u.display_name}</Link>
+                    <span className="ml-auto text-xs text-muted tabular-nums">{u.rep}</span>
                   </li>
                 ))}
               </ol>
             )}
-          </div>
-          <div className="card space-y-2 p-5 text-sm">
-            <h2 className="font-semibold">Badges mean something</h2>
-            <p className="text-muted">
-              Every badge follows a public rule anyone can audit. No brand, no impact factor — just evidence.
+          </section>
+          <section>
+            <h2 className="kicker border-b border-line pb-2">Badges are rules, not brands</h2>
+            <p className="mt-3 leading-relaxed text-muted">
+              Every badge is awarded by a public rule anyone can audit. No impact factor, no prestige, only evidence.
             </p>
-            <Link href="/about#badges" className="text-accent underline">See the rules</Link>
-          </div>
+            <Link href="/about#badges" className="link mt-2 inline-block">Read the rules</Link>
+          </section>
         </aside>
       </div>
     </div>

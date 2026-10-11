@@ -7,3 +7,4 @@ data
 skills-lock.json
 node_modules
 .next
+.playwright-mcp
